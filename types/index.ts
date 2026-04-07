@@ -61,7 +61,7 @@ export interface Goal {
   id: string
   user_id: string
   name?: string
-  title: string
+  title?: string
   description?: string | null
   target_value: number
   current_value: number

@@ -11,12 +11,12 @@ import { GoalCard, GoalsSummary } from '@/components/goals/goal-card'
 import type { Goal, GoalCategory } from '@/types'
 
 const DEMO_GOALS: Goal[] = [
-  { id: '1', user_id: '1', name: '10 kg ver', description: 'Sağlıklı kilo hedefi', target_value: 10, current_value: 4, unit: 'kg', deadline: '2025-06-01', category: 'health', status: 'active', created_at: '', updated_at: '' },
-  { id: '2', user_id: '1', name: '50 kitap oku', description: 'Yıllık okuma hedefi', target_value: 50, current_value: 18, unit: 'kitap', deadline: '2025-12-31', category: 'education', status: 'active', created_at: '', updated_at: '' },
-  { id: '3', user_id: '1', name: '₺100.000 biriktir', description: 'Acil durum fonu', target_value: 100000, current_value: 35000, unit: '₺', deadline: '2025-12-31', category: 'finance', status: 'active', created_at: '', updated_at: '' },
-  { id: '4', user_id: '1', name: 'İngilizce C1', description: 'Dil seviyesi hedefi', target_value: 100, current_value: 65, unit: '%', deadline: '2025-09-01', category: 'education', status: 'active', created_at: '', updated_at: '' },
-  { id: '5', user_id: '1', name: 'Maraton koş', description: '42 km maraton tamamla', target_value: 42, current_value: 21, unit: 'km', deadline: '2025-10-15', category: 'fitness', status: 'active', created_at: '', updated_at: '' },
-  { id: '6', user_id: '1', name: '30 gün meditasyon', description: 'Kesintisiz meditasyon serisi', target_value: 30, current_value: 30, unit: 'gün', deadline: '2025-02-01', category: 'personal', status: 'completed', created_at: '', updated_at: '' },
+  { id: '1', user_id: '1', title: '10 kg ver', name: '10 kg ver', description: 'Sağlıklı kilo hedefi', target_value: 10, current_value: 4, unit: 'kg', deadline: '2025-06-01', category: 'health', status: 'active', created_at: '', updated_at: '' },
+  { id: '2', user_id: '1', title: '50 kitap oku', name: '50 kitap oku', description: 'Yıllık okuma hedefi', target_value: 50, current_value: 18, unit: 'kitap', deadline: '2025-12-31', category: 'education', status: 'active', created_at: '', updated_at: '' },
+  { id: '3', user_id: '1', title: '₺100.000 biriktir', name: '₺100.000 biriktir', description: 'Acil durum fonu', target_value: 100000, current_value: 35000, unit: '₺', deadline: '2025-12-31', category: 'finance', status: 'active', created_at: '', updated_at: '' },
+  { id: '4', user_id: '1', title: 'İngilizce C1', name: 'İngilizce C1', description: 'Dil seviyesi hedefi', target_value: 100, current_value: 65, unit: '%', deadline: '2025-09-01', category: 'education', status: 'active', created_at: '', updated_at: '' },
+  { id: '5', user_id: '1', title: 'Maraton koş', name: 'Maraton koş', description: '42 km maraton tamamla', target_value: 42, current_value: 21, unit: 'km', deadline: '2025-10-15', category: 'fitness', status: 'active', created_at: '', updated_at: '' },
+  { id: '6', user_id: '1', title: '30 gün meditasyon', name: '30 gün meditasyon', description: 'Kesintisiz meditasyon serisi', target_value: 30, current_value: 30, unit: 'gün', deadline: '2025-02-01', category: 'personal', status: 'completed', created_at: '', updated_at: '' },
 ]
 
 const CATEGORIES: { id: GoalCategory; label: string }[] = [

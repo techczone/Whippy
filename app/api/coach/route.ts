@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-// Bu API route, Next.js sunucusunda çalışır ve Anthropic API'ye istek yapar
-// Artifacts içinde çalışan client-side kodu için API key gerekli değildir
-
 export const runtime = 'edge'
 
 interface CoachRequestBody {
@@ -25,7 +22,7 @@ interface CoachRequestBody {
 }
 
 function getSystemPrompt(mode: string, stats: CoachRequestBody['stats']): string {
-  const basePrompt = `Sen profesyonel bir AI yaşam koçusun. Türkçe yanıt ver. Her zaman samimi, doğrudan ve yardımcı ol.
+  const basePrompt = `Sen "Whippy" - acımasızca dürüst bir AI yaşam koçusun. Türkçe yanıt ver. Sloganın: "Bahane yok, sadece sonuç" 🔥
 
 Kullanıcının güncel verileri:
 - Alışkanlıklar: ${stats.completedHabits}/${stats.totalHabits} tamamlandı (${stats.habitScore}%)
@@ -82,8 +79,20 @@ export async function POST(request: NextRequest) {
     const body: CoachRequestBody = await request.json()
     const { message, mode, stats, history = [] } = body
 
+    // Groq API key kontrolü
+    const apiKey = process.env.GROQ_API_KEY
+    
+    if (!apiKey) {
+      console.log('GROQ_API_KEY not found, using demo response')
+      return NextResponse.json({
+        content: getDemoResponse(mode, stats),
+        isDemo: true,
+      })
+    }
+
     // Mesaj geçmişini formatla
     const messages = [
+      { role: 'system' as const, content: getSystemPrompt(mode, stats) },
       ...history.slice(-10).map((m) => ({
         role: m.role as 'user' | 'assistant',
         content: m.content,
@@ -91,27 +100,25 @@ export async function POST(request: NextRequest) {
       { role: 'user' as const, content: message },
     ]
 
-    // Anthropic API'ye istek yap
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    // Groq API'ye istek yap
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY || '',
-        'anthropic-version': '2023-06-01',
+        'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1024,
-        system: getSystemPrompt(mode, stats),
+        model: 'llama-3.3-70b-versatile',
         messages,
+        max_tokens: 1024,
+        temperature: 0.7,
       }),
     })
 
     if (!response.ok) {
       const errorData = await response.text()
-      console.error('Anthropic API error:', errorData)
+      console.error('Groq API error:', errorData)
       
-      // API key yoksa veya hatalıysa demo yanıt döndür
       return NextResponse.json({
         content: getDemoResponse(mode, stats),
         isDemo: true,
@@ -119,15 +126,14 @@ export async function POST(request: NextRequest) {
     }
 
     const data = await response.json()
-    const content = data.content?.[0]?.text || 'Bir hata oluştu.'
+    const content = data.choices?.[0]?.message?.content || 'Bir hata oluştu.'
 
     return NextResponse.json({ content, isDemo: false })
   } catch (error) {
     console.error('Coach API error:', error)
     
-    // Hata durumunda demo yanıt
     return NextResponse.json({
-      content: 'Şu an AI koçuna bağlanamıyorum. Lütfen daha sonra tekrar dene.',
+      content: getDemoResponse(mode, stats),
       isDemo: true,
     })
   }
@@ -156,7 +162,7 @@ function getDemoResponse(mode: string, stats: CoachRequestBody['stats']): string
     ],
     brutal: [
       habitPercent < 50
-        ? `${stats.completedHabits}/${stats.totalHabits} alışkanlık mı? Bu rezalet. Bahane üretmeyi bırak ve işine bak.`
+        ? `${stats.completedHabits}/${stats.totalHabits} alışkanlık mı? Bu rezalet. Bahane üretmeyi bırak ve işine bak. 🔥`
         : `${habitPercent}% fena değil ama daha iyisini yapabilirsin. Kendinle barışık olmayı bırak, zorla kendini.`,
       stats.exercise === 0
         ? `Bugün 0 dakika egzersiz. SIFIR. O koltuktan kalk ve bir şeyler yap. Yarın da aynı bahaneyi görmek istemiyorum.`

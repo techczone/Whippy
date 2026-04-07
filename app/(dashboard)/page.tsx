@@ -1,35 +1,35 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { 
+  Plus, 
   TrendingUp, 
+  Target, 
   Heart, 
-  Smile, 
-  Trophy,
-  Plus,
-  Sparkles
+  Sparkles,
+  ChevronRight,
+  Flame,
 } from 'lucide-react'
-import { useAppStore, useHabitsForToday, useTodayMood, useTodayHealth, useActiveGoals, useActiveProjects } from '@/lib/store'
-import { StatCard } from '@/components/dashboard/stat-card'
-import { HabitCard } from '@/components/habits/habit-card'
-import { MoodSelector } from '@/components/mood/mood-selector'
-import { HealthTracker } from '@/components/health/health-tracker'
-import { GoalCard } from '@/components/goals/goal-card'
-import { ProjectCard } from '@/components/projects/project-card'
-import { AICoach } from '@/components/coach/ai-coach'
-import { WeeklyChart } from '@/components/charts/weekly-chart'
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
+import Link from 'next/link'
+import { cn, formatDate, getWeekDays } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { cn, calculateOverallScore, calculateHealthScore, formatTurkishDate } from '@/lib/utils'
-import type { Habit, Goal, Project, HabitLog, MoodEntry, HealthEntry } from '@/types'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { StatCard } from '@/components/dashboard/stat-card'
+import { HabitCard, HabitCardMini } from '@/components/habits/habit-card'
+import { MoodSelector, MoodWeekView } from '@/components/mood/mood-selector'
+import { HealthSummaryCard } from '@/components/health/health-tracker'
+import { GoalCard, GoalsSummary } from '@/components/goals/goal-card'
+import { WeeklyChart, MoodTrendChart } from '@/components/charts/weekly-chart'
+import { useAppStore } from '@/lib/store'
+import type { Habit, Goal, MoodEntry, HealthEntry } from '@/types'
 
 // Demo data for initial state
-const DEMO_HABITS: Habit[] = [
-  { id: '1', user_id: 'demo', name: 'Sabah meditasyonu', icon: '🧘', color: '#8B5CF6', frequency: 'daily', streak: 5, best_streak: 12, created_at: new Date().toISOString() },
-  { id: '2', user_id: 'demo', name: '10.000 adım', icon: '🚶', color: '#14B8A6', frequency: 'daily', streak: 3, best_streak: 7, created_at: new Date().toISOString() },
-  { id: '3', user_id: 'demo', name: 'Kitap okuma (30 dk)', icon: '📚', color: '#F59E0B', frequency: 'daily', streak: 8, best_streak: 15, created_at: new Date().toISOString() },
-  { id: '4', user_id: 'demo', name: '8 saat uyku', icon: '😴', color: '#3B82F6', frequency: 'daily', streak: 2, best_streak: 10, created_at: new Date().toISOString() },
+const DEMO_HABITS: (Habit & { completedToday: boolean })[] = [
+  { id: '1', user_id: '1', name: 'Sabah meditasyonu', description: null, icon: '🧘', color: '#8B5CF6', frequency: 'daily', target_days: [], reminder_time: '07:00', streak: 12, best_streak: 15, created_at: '', updated_at: '', archived: false, completedToday: true },
+  { id: '2', user_id: '1', name: '30 dk egzersiz', description: null, icon: '💪', color: '#22C55E', frequency: 'daily', target_days: [], reminder_time: '08:00', streak: 5, best_streak: 20, created_at: '', updated_at: '', archived: false, completedToday: false },
+  { id: '3', user_id: '1', name: '2.5L su iç', description: null, icon: '💧', color: '#3B82F6', frequency: 'daily', target_days: [], reminder_time: null, streak: 8, best_streak: 30, created_at: '', updated_at: '', archived: false, completedToday: true },
+  { id: '4', user_id: '1', name: '30 dk okuma', description: null, icon: '📚', color: '#F97316', frequency: 'daily', target_days: [], reminder_time: '21:00', streak: 3, best_streak: 10, created_at: '', updated_at: '', archived: false, completedToday: false },
 ]
 
 const DEMO_GOALS: Goal[] = [
@@ -37,375 +37,276 @@ const DEMO_GOALS: Goal[] = [
   { id: '2', user_id: '1', title: '50 kitap oku', name: '50 kitap oku', description: 'Yıllık okuma hedefi', target_value: 50, current_value: 18, unit: 'kitap', deadline: '2025-12-31', category: 'education', status: 'active', created_at: '', updated_at: '' },
 ]
 
-const DEMO_PROJECTS: Project[] = [
-  { id: '1', user_id: 'demo', name: 'Trading Bot Geliştirme', description: 'Solana memecoin trading botu', color: '#8B5CF6', status: 'active', progress: 75, created_at: new Date().toISOString() },
-  { id: '2', user_id: 'demo', name: 'Yaşam Koçu App', description: 'AI destekli yaşam koçu uygulaması', color: '#14B8A6', status: 'active', progress: 40, created_at: new Date().toISOString() },
+const DEMO_MOODS: MoodEntry[] = [
+  { id: '1', user_id: '1', date: getWeekDays()[0].toISOString().split('T')[0], value: 4, note: null, tags: [], energy_level: null, stress_level: null, created_at: '' },
+  { id: '2', user_id: '1', date: getWeekDays()[1].toISOString().split('T')[0], value: 3, note: null, tags: [], energy_level: null, stress_level: null, created_at: '' },
+  { id: '3', user_id: '1', date: getWeekDays()[2].toISOString().split('T')[0], value: 5, note: null, tags: [], energy_level: null, stress_level: null, created_at: '' },
+  { id: '4', user_id: '1', date: getWeekDays()[3].toISOString().split('T')[0], value: 4, note: null, tags: [], energy_level: null, stress_level: null, created_at: '' },
+  { id: '5', user_id: '1', date: getWeekDays()[4].toISOString().split('T')[0], value: 3, note: null, tags: [], energy_level: null, stress_level: null, created_at: '' },
+  { id: '6', user_id: '1', date: getWeekDays()[5].toISOString().split('T')[0], value: 5, note: null, tags: [], energy_level: null, stress_level: null, created_at: '' },
 ]
 
+const DEMO_HEALTH: Partial<HealthEntry> = {
+  water_liters: 1.5,
+  sleep_hours: 7,
+  exercise_minutes: 30,
+  calories: 1800,
+  steps: 6500,
+}
+
+const DEMO_WEEKLY_DATA = getWeekDays().map((date, i) => ({
+  date: date.toISOString().split('T')[0],
+  productivity: 60 + Math.random() * 30,
+  health: 50 + Math.random() * 40,
+  mood: 40 + Math.random() * 50,
+}))
+
 export default function DashboardPage() {
-  const [mounted, setMounted] = useState(false)
-  const { 
-    habits, setHabits,
-    habitLogs, addHabitLog,
-    goals, setGoals, updateGoal,
-    projects, setProjects, updateProject,
-    moods, addMood,
-    health, updateHealth,
-  } = useAppStore()
-  
-  const habitsForToday = useHabitsForToday()
-  const todayMood = useTodayMood()
-  const todayHealth = useTodayHealth()
-  const activeGoals = useActiveGoals()
-  const activeProjects = useActiveProjects()
+  const [habits, setHabits] = useState(DEMO_HABITS)
+  const [goals] = useState(DEMO_GOALS)
+  const [moods, setMoods] = useState(DEMO_MOODS)
+  const [health, setHealth] = useState(DEMO_HEALTH)
+  const [todayMood, setTodayMood] = useState<1 | 2 | 3 | 4 | 5 | undefined>(undefined)
 
-  // Initialize demo data
-  useEffect(() => {
-    setMounted(true)
-    if (habits.length === 0) {
-      setHabits(DEMO_HABITS)
-    }
-    if (goals.length === 0) {
-      setGoals(DEMO_GOALS)
-    }
-    if (projects.length === 0) {
-      setProjects(DEMO_PROJECTS)
-    }
-  }, [])
+  const today = new Date()
+  const greeting = getGreeting()
 
-  // Calculate stats
-  const today = new Date().toISOString().split('T')[0]
-  const completedHabits = habitsForToday.filter(h => h.completedToday).length
-  const totalHabits = habitsForToday.length
-  const habitScore = totalHabits > 0 ? Math.round((completedHabits / totalHabits) * 100) : 0
+  // Calculate scores
+  const completedHabits = habits.filter(h => h.completedToday).length
+  const totalHabits = habits.length
+  const productivityScore = totalHabits > 0 ? Math.round((completedHabits / totalHabits) * 100) : 0
+  const healthScore = calculateHealthScore(health)
+  const moodScore = todayMood ? todayMood * 20 : 60
+  const overallScore = Math.round((productivityScore + healthScore + moodScore) / 3)
 
-  const healthScore = calculateHealthScore(
-    todayHealth?.exercise_minutes || 0,
-    todayHealth?.water_liters || 0,
-    todayHealth?.sleep_hours || 0
-  )
+  const handleHabitToggle = (id: string) => {
+    setHabits(prev => prev.map(h => 
+      h.id === id ? { ...h, completedToday: !h.completedToday, streak: !h.completedToday ? h.streak + 1 : h.streak - 1 } : h
+    ))
+  }
 
-  const moodScore = todayMood ? (todayMood.value / 5) * 100 : 0
-  const overallScore = calculateOverallScore(habitScore, healthScore, moodScore)
-
-  // Toggle habit completion
-  const toggleHabit = (habitId: string) => {
-    const existingLog = habitLogs.find(
-      log => log.habit_id === habitId && log.date === today
-    )
-    
-    addHabitLog({
-      id: `${habitId}-${today}`,
-      habit_id: habitId,
-      user_id: 'demo',
-      date: today,
-      completed: !existingLog?.completed,
-      created_at: new Date().toISOString()
+  const handleMoodChange = (mood: 1 | 2 | 3 | 4 | 5) => {
+    setTodayMood(mood)
+    const todayStr = today.toISOString().split('T')[0]
+    setMoods(prev => {
+      const filtered = prev.filter(m => m.date !== todayStr)
+      return [...filtered, { 
+        id: Date.now().toString(), 
+        user_id: '1', 
+        date: todayStr, 
+        value: mood, 
+        note: null, 
+        tags: [], 
+        energy_level: null, 
+        stress_level: null, 
+        created_at: '' 
+      }]
     })
-  }
-
-  // Add new habit
-  const addNewHabit = () => {
-    const name = prompt('Yeni alışkanlık adı:')
-    if (name) {
-      const newHabit: Habit = {
-        id: Date.now().toString(),
-        user_id: 'demo',
-        name,
-        icon: '✨',
-        color: '#8B5CF6',
-        frequency: 'daily',
-        streak: 0,
-        best_streak: 0,
-        created_at: new Date().toISOString()
-      }
-      useAppStore.getState().addHabit(newHabit)
-    }
-  }
-
-  // Add new goal
-  const addNewGoal = () => {
-    const title = prompt('Yeni hedef:')
-    if (title) {
-      const newGoal: Goal = {
-        id: Date.now().toString(),
-        user_id: 'demo',
-        title,
-        category: 'personal',
-        target_value: 100,
-        current_value: 0,
-        unit: '%',
-        status: 'active',
-        created_at: new Date().toISOString()
-      }
-      useAppStore.getState().addGoal(newGoal)
-    }
-  }
-
-  // Add new project
-  const addNewProject = () => {
-    const name = prompt('Yeni proje adı:')
-    if (name) {
-      const newProject: Project = {
-        id: Date.now().toString(),
-        user_id: 'demo',
-        name,
-        color: '#14B8A6',
-        status: 'active',
-        progress: 0,
-        created_at: new Date().toISOString()
-      }
-      useAppStore.getState().addProject(newProject)
-    }
-  }
-
-  if (!mounted) {
-    return null
   }
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex items-center justify-between"
-      >
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold gradient-text">
-            Hayat Koçu Pro
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            {formatTurkishDate(new Date())}
+          <h1 className="text-2xl md:text-3xl font-bold">{greeting}</h1>
+          <p className="text-muted-foreground">
+            {formatDate(today, 'EEEE, d MMMM yyyy')}
           </p>
         </div>
-        <Button variant="glow" size="sm" className="hidden md:flex">
-          <Sparkles className="w-4 h-4 mr-2" />
-          Pro'ya Yükselt
-        </Button>
-      </motion.div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" asChild>
+            <Link href="/reports">
+              <TrendingUp className="w-4 h-4 mr-2" />
+              Raporlar
+            </Link>
+          </Button>
+          <Button asChild>
+            <Link href="/coach">
+              <Sparkles className="w-4 h-4 mr-2" />
+              AI Koç
+            </Link>
+          </Button>
+        </div>
+      </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Score cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <StatCard
+          title="Genel Skor"
+          value={overallScore}
+          icon="🎯"
+          change={5}
+          changeLabel="vs dün"
+          variant="circular"
+        />
         <StatCard
           title="Verimlilik"
-          value={habitScore}
-          suffix="%"
-          icon={TrendingUp}
-          trend={{ value: 5, positive: true }}
-          color="purple"
-          variant="circular"
+          value={productivityScore}
+          icon="⚡"
+          subtitle={`${completedHabits}/${totalHabits} alışkanlık`}
         />
         <StatCard
           title="Sağlık"
           value={healthScore}
-          suffix="%"
-          icon={Heart}
-          trend={{ value: 3, positive: true }}
-          color="teal"
-          variant="circular"
+          icon="❤️"
+          change={-3}
+          changeLabel="vs dün"
         />
         <StatCard
           title="Ruh Hali"
-          value={todayMood ? ['😫', '😔', '😐', '🙂', '😄'][todayMood.value - 1] : '-'}
-          icon={Smile}
-          color="amber"
-        />
-        <StatCard
-          title="Genel Skor"
-          value={overallScore}
-          suffix="%"
-          icon={Trophy}
-          trend={{ value: 8, positive: true }}
-          color="green"
-          variant="circular"
+          value={moodScore}
+          icon="😊"
+          change={10}
+          changeLabel="vs dün"
         />
       </div>
 
-      {/* Main Content Grid */}
-      <div className="grid lg:grid-cols-3 gap-6">
-        {/* Left Column - Habits & Health */}
+      {/* Main content grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left column - Habits & Mood */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Habits */}
-          <Card variant="glass">
-            <CardHeader className="flex flex-row items-center justify-between">
+          {/* Habits section */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="flex items-center gap-2">
-                <span>📋</span>
-                Günlük Alışkanlıklar
+                <Target className="w-5 h-5 text-primary" />
+                Bugünkü Alışkanlıklar
               </CardTitle>
-              <Button variant="ghost" size="sm" onClick={addNewHabit}>
-                <Plus className="w-4 h-4 mr-1" />
-                Ekle
-              </Button>
+              <Link href="/habits">
+                <Button variant="ghost" size="sm">
+                  Tümü <ChevronRight className="w-4 h-4 ml-1" />
+                </Button>
+              </Link>
             </CardHeader>
-            <CardContent>
-              <div className="grid md:grid-cols-2 gap-3">
-                {habitsForToday.map((habit, index) => (
-                  <motion.div
-                    key={habit.id}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.1 }}
-                  >
-                    <HabitCard
-                      habit={habit}
-                      completed={habit.completedToday}
-                      onToggle={() => toggleHabit(habit.id)}
-                    />
-                  </motion.div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Mood & Health Row */}
-          <div className="grid md:grid-cols-2 gap-6">
-            {/* Mood */}
-            <Card variant="glass">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <span>😊</span>
-                  Ruh Hali
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <MoodSelector
-                  selectedMood={todayMood?.value}
-                  onSelect={(value) => addMood({
-                    id: `mood-${today}`,
-                    user_id: 'demo',
-                    date: today,
-                    value,
-                    created_at: new Date().toISOString()
-                  })}
+            <CardContent className="space-y-3">
+              {habits.map((habit) => (
+                <HabitCard
+                  key={habit.id}
+                  id={habit.id}
+                  name={habit.name}
+                  icon={habit.icon}
+                  color={habit.color}
+                  streak={habit.streak}
+                  completed={habit.completedToday}
+                  onToggle={handleHabitToggle}
                 />
-              </CardContent>
-            </Card>
-
-            {/* Health */}
-            <Card variant="glass">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <span>🏃</span>
-                  Sağlık Metrikleri
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <HealthTracker
-                  data={todayHealth}
-                  onUpdate={(updates) => updateHealth(today, updates)}
-                />
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Weekly Chart */}
-          <Card variant="glass">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <span>📊</span>
-                Haftalık Trend
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <WeeklyChart />
-            </CardContent>
-          </Card>
-
-          {/* Goals */}
-          <Card variant="glass">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <span>🎯</span>
-                Hedefler
-              </CardTitle>
-              <Button variant="ghost" size="sm" onClick={addNewGoal}>
-                <Plus className="w-4 h-4 mr-1" />
-                Ekle
+              ))}
+              <Button variant="outline" className="w-full mt-2" asChild>
+                <Link href="/habits/new">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Yeni Alışkanlık Ekle
+                </Link>
               </Button>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {activeGoals.map((goal, index) => (
-                  <motion.div
-                    key={goal.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.1 }}
-                  >
-                    <GoalCard
-                      goal={goal}
-                      onUpdate={(updates) => updateGoal(goal.id, updates)}
-                    />
-                  </motion.div>
-                ))}
-                {activeGoals.length === 0 && (
-                  <p className="text-center text-muted-foreground py-4">
-                    Henüz hedef eklenmemiş
-                  </p>
-                )}
-              </div>
             </CardContent>
           </Card>
 
-          {/* Projects */}
-          <Card variant="glass">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <span>🚀</span>
-                Aktif Projeler
-              </CardTitle>
-              <Button variant="ghost" size="sm" onClick={addNewProject}>
-                <Plus className="w-4 h-4 mr-1" />
-                Ekle
-              </Button>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {activeProjects.map((project, index) => (
-                  <motion.div
-                    key={project.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.1 }}
-                  >
-                    <ProjectCard
-                      project={project}
-                      onUpdate={(updates) => updateProject(project.id, updates)}
-                    />
-                  </motion.div>
-                ))}
-                {activeProjects.length === 0 && (
-                  <p className="text-center text-muted-foreground py-4">
-                    Henüz proje eklenmemiş
-                  </p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+          {/* Weekly chart */}
+          <WeeklyChart data={DEMO_WEEKLY_DATA} />
         </div>
 
-        {/* Right Column - AI Coach */}
-        <div className="lg:col-span-1">
-          <div className="sticky top-6">
-            <AICoach
-              stats={{
-                habitScore,
-                healthScore,
-                moodScore,
-                overallScore,
-                completedHabits,
-                totalHabits,
-                exercise: todayHealth?.exercise_minutes || 0,
-                sleep: todayHealth?.sleep_hours || 0,
-                water: todayHealth?.water_liters || 0,
-                goals: activeGoals.map(g => `${g.title}: %${Math.round((g.current_value / g.target_value) * 100)}`).join(', '),
-                projects: activeProjects.map(p => `${p.name}: %${p.progress}`).join(', ')
-              }}
-            />
-          </div>
+        {/* Right column - Mood, Health, Goals */}
+        <div className="space-y-6">
+          {/* Mood section */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">Bugün Nasıl Hissediyorsun?</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <MoodSelector
+                value={todayMood}
+                onChange={handleMoodChange}
+                showLabels
+                size="lg"
+              />
+              <div className="pt-2 border-t border-border">
+                <p className="text-sm text-muted-foreground mb-2">Bu hafta</p>
+                <MoodWeekView moods={moods.map(m => ({ date: m.date, value: m.value }))} />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Health section */}
+          <HealthSummaryCard data={health} />
+
+          {/* Goals section */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <TrendingUp className="w-5 h-5 text-primary" />
+                Hedefler
+              </CardTitle>
+              <Link href="/goals">
+                <Button variant="ghost" size="sm">
+                  Tümü <ChevronRight className="w-4 h-4 ml-1" />
+                </Button>
+              </Link>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {goals.slice(0, 2).map((goal) => (
+                <GoalCard key={goal.id} goal={goal} compact />
+              ))}
+            </CardContent>
+          </Card>
+
+          {/* Streak highlights */}
+          <Card className="bg-gradient-to-br from-orange-500/10 to-amber-500/10 border-orange-500/30">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 rounded-xl bg-orange-500/20 flex items-center justify-center">
+                  <Flame className="w-6 h-6 text-orange-500" />
+                </div>
+                <div>
+                  <h3 className="font-semibold">En Uzun Seri</h3>
+                  <p className="text-sm text-muted-foreground">Devam ettir!</p>
+                </div>
+              </div>
+              <div className="space-y-2">
+                {habits
+                  .sort((a, b) => b.streak - a.streak)
+                  .slice(0, 3)
+                  .map((habit) => (
+                    <div key={habit.id} className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span>{habit.icon}</span>
+                        <span className="text-sm">{habit.name}</span>
+                      </div>
+                      <span className="streak-badge">{habit.streak} gün</span>
+                    </div>
+                  ))}
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>
   )
+}
+
+function getGreeting(): string {
+  const hour = new Date().getHours()
+  if (hour < 6) return 'İyi Geceler 🌙'
+  if (hour < 12) return 'Günaydın ☀️'
+  if (hour < 18) return 'İyi Günler 👋'
+  return 'İyi Akşamlar 🌆'
+}
+
+function calculateHealthScore(health: Partial<HealthEntry>): number {
+  let score = 0
+  let count = 0
+
+  if (health.water_liters) {
+    score += Math.min(100, (health.water_liters / 2.5) * 100)
+    count++
+  }
+  if (health.sleep_hours) {
+    score += Math.min(100, (health.sleep_hours / 8) * 100)
+    count++
+  }
+  if (health.exercise_minutes) {
+    score += Math.min(100, (health.exercise_minutes / 60) * 100)
+    count++
+  }
+
+  return count > 0 ? Math.round(score / count) : 0
 }

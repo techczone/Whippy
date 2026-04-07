@@ -33,8 +33,8 @@ const DEMO_HABITS: Habit[] = [
 ]
 
 const DEMO_GOALS: Goal[] = [
-  { id: '1', user_id: 'demo', title: '10 kg vermek', description: 'Yıl sonuna kadar hedef kilo', category: 'health', target_value: 10, current_value: 3, unit: 'kg', deadline: '2026-12-31', status: 'active', created_at: new Date().toISOString() },
-  { id: '2', user_id: 'demo', title: 'İngilizce B2 seviyesi', description: 'Cambridge sınavına hazırlık', category: 'learning', target_value: 100, current_value: 45, unit: '%', deadline: '2026-09-01', status: 'active', created_at: new Date().toISOString() },
+  { id: '1', user_id: '1', title: '10 kg ver', name: '10 kg ver', description: 'Sağlıklı kilo hedefi', target_value: 10, current_value: 4, unit: 'kg', deadline: '2025-06-01', category: 'health', status: 'active', created_at: '', updated_at: '' },
+  { id: '2', user_id: '1', title: '50 kitap oku', name: '50 kitap oku', description: 'Yıllık okuma hedefi', target_value: 50, current_value: 18, unit: 'kitap', deadline: '2025-12-31', category: 'education', status: 'active', created_at: '', updated_at: '' },
 ]
 
 const DEMO_PROJECTS: Project[] = [

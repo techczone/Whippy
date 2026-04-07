@@ -122,11 +122,9 @@ export default function ProfilePage() {
               </p>
 
               {/* Tier Badge */}
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-secondary text-sm font-medium mb-4">
-                {demoUser.tier === 'free' && '🆓 Ücretsiz Plan'}
-                {demoUser.tier === 'pro' && '⭐ Pro Plan'}
-                {demoUser.tier === 'elite' && '👑 Elite Plan'}
-              </div>
+<div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-secondary text-sm font-medium mb-4">
+  {demoUser.tier === 'free' ? '🆓 Ücretsiz Plan' : demoUser.tier === 'pro' ? '⭐ Pro Plan' : '👑 Elite Plan'}
+</div>
 
               {/* Join Date */}
               <p className="text-xs text-muted-foreground flex items-center gap-1">

@@ -44,6 +44,8 @@ interface AppState {
   // UI state
   sidebarOpen: boolean
   setSidebarOpen: (open: boolean) => void
+  mobileMenuOpen: boolean
+  setMobileMenuOpen: (open: boolean) => void
   
   // Coach state
   coachMode: CoachMode
@@ -129,6 +131,8 @@ export const useAppStore = create<AppState>()(
       // UI state
       sidebarOpen: true,
       setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
+      mobileMenuOpen: false,
+      setMobileMenuOpen: (mobileMenuOpen) => set({ mobileMenuOpen }),
       
       // Coach state
       coachMode: 'gentle',

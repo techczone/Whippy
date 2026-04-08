@@ -7,6 +7,8 @@ export async function GET(request: Request) {
   const code = searchParams.get('code')
   const next = searchParams.get('next') ?? '/dashboard'
 
+  console.log('Auth callback started, code:', code ? 'exists' : 'missing')
+
   if (code) {
     const cookieStore = await cookies()
     
@@ -23,17 +25,17 @@ export async function GET(request: Request) {
               cookiesToSet.forEach(({ name, value, options }) =>
                 cookieStore.set(name, value, options)
               )
-            } catch {
-              // The `setAll` method was called from a Server Component.
-              // This can be ignored if you have middleware refreshing
-              // user sessions.
+            } catch (e) {
+              console.log('Cookie set error:', e)
             }
           },
         },
       }
     )
 
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+    
+    console.log('Exchange result - data:', data ? 'exists' : 'null', 'error:', error?.message || 'none')
 
     if (!error) {
       const forwardedHost = request.headers.get('x-forwarded-host')
@@ -47,8 +49,9 @@ export async function GET(request: Request) {
         return NextResponse.redirect(`${origin}${next}`)
       }
     }
+    
+    console.log('Auth error:', error.message)
   }
 
-  // Return the user to an error page with instructions
   return NextResponse.redirect(`${origin}/login?error=auth_failed`)
 }

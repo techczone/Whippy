@@ -110,12 +110,17 @@ export function useAuth() {
     }
   }, [supabase, fetchUserData])
 
-  // Sign in with OAuth
+  // Sign in with OAuth - PKCE flow with skipBrowserRedirect disabled
   const signInWithOAuth = useCallback(async (provider: 'google' | 'apple') => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
+        skipBrowserRedirect: false,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        },
       },
     })
     if (error) throw error

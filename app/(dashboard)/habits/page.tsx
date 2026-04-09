@@ -16,7 +16,7 @@ const HABIT_COLORS = ['#8B5CF6', '#3B82F6', '#22C55E', '#F97316', '#EC4899', '#1
 
 export default function HabitsPage() {
   const { t, language } = useTranslation()
-  const { habits, loading, addHabit, toggleHabit, deleteHabit, todayLogs } = useHabits()
+  const { habits = [], loading, addHabit, toggleHabit, deleteHabit, todayLogs = [] } = useHabits()
   const [showAddModal, setShowAddModal] = useState(false)
   const [mounted, setMounted] = useState(false)
 
@@ -24,8 +24,12 @@ export default function HabitsPage() {
     setMounted(true)
   }, [])
 
-  const activeHabits = habits.filter(h => !h.archived)
-  const completedCount = todayLogs.length
+  // Safe array operations
+  const safeHabits = habits || []
+  const safeTodayLogs = todayLogs || []
+  
+  const activeHabits = safeHabits.filter(h => !h.archived)
+  const completedCount = safeTodayLogs.length
   const totalCount = activeHabits.length
   const completionRate = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
 
@@ -34,7 +38,7 @@ export default function HabitsPage() {
   }
 
   const handleDelete = async (habitId: string) => {
-    if (confirm(t.messages.delete_confirm)) {
+    if (confirm(t.messages?.delete_confirm || 'Silmek istediğine emin misin?')) {
       await deleteHabit(habitId)
       toast.success(language === 'tr' ? 'Alışkanlık silindi' : 'Habit deleted')
     }
@@ -48,7 +52,22 @@ export default function HabitsPage() {
     }
   }
 
-  if (!mounted || loading) {
+  // Prevent hydration mismatch
+  if (!mounted) {
+    return (
+      <div className="space-y-6 animate-pulse">
+        <div className="h-10 bg-muted rounded w-48" />
+        <div className="grid grid-cols-3 gap-4">
+          {[1,2,3].map(i => <div key={i} className="h-20 bg-muted rounded-xl" />)}
+        </div>
+        <div className="space-y-3">
+          {[1,2,3,4].map(i => <div key={i} className="h-20 bg-muted rounded-xl" />)}
+        </div>
+      </div>
+    )
+  }
+
+  if (loading) {
     return (
       <div className="space-y-6 animate-pulse">
         <div className="h-10 bg-muted rounded w-48" />
@@ -67,8 +86,8 @@ export default function HabitsPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold">{t.habits.title}</h1>
-          <p className="text-muted-foreground">{t.habits.subtitle}</p>
+          <h1 className="text-2xl md:text-3xl font-bold">{t.habits?.title || 'Alışkanlıklar'}</h1>
+          <p className="text-muted-foreground">{t.habits?.subtitle || 'Günlük alışkanlıklarını takip et'}</p>
         </div>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Calendar className="w-4 h-4" />
@@ -81,19 +100,19 @@ export default function HabitsPage() {
         <Card>
           <CardContent className="pt-4 text-center">
             <p className="text-2xl font-bold text-primary">{totalCount}</p>
-            <p className="text-xs text-muted-foreground">{t.habits.total}</p>
+            <p className="text-xs text-muted-foreground">{t.habits?.total || 'Toplam'}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4 text-center">
             <p className="text-2xl font-bold text-green-500">{completedCount}</p>
-            <p className="text-xs text-muted-foreground">{t.habits.completed_today}</p>
+            <p className="text-xs text-muted-foreground">{t.habits?.completed_today || 'Bugün'}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4 text-center">
             <p className="text-2xl font-bold text-orange-500">{completionRate}%</p>
-            <p className="text-xs text-muted-foreground">{t.habits.completion}</p>
+            <p className="text-xs text-muted-foreground">{t.habits?.completion || 'Tamamlama'}</p>
           </CardContent>
         </Card>
       </div>
@@ -101,7 +120,7 @@ export default function HabitsPage() {
       {/* Add button (desktop) */}
       <Button onClick={() => setShowAddModal(true)} className="hidden md:flex">
         <Plus className="w-4 h-4 mr-2" />
-        {t.habits.add_new}
+        {t.habits?.add_new || 'Yeni Ekle'}
       </Button>
 
       {/* Habits List */}
@@ -111,17 +130,17 @@ export default function HabitsPage() {
             <Card>
               <CardContent className="py-12 text-center">
                 <Target className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                <h3 className="font-medium mb-2">{t.habits.no_habits}</h3>
-                <p className="text-sm text-muted-foreground mb-4">{t.habits.create_first}</p>
+                <h3 className="font-medium mb-2">{t.habits?.no_habits || 'Henüz alışkanlık yok'}</h3>
+                <p className="text-sm text-muted-foreground mb-4">{t.habits?.create_first || 'İlk alışkanlığını oluştur'}</p>
                 <Button onClick={() => setShowAddModal(true)}>
                   <Plus className="w-4 h-4 mr-2" />
-                  {t.habits.add_new}
+                  {t.habits?.add_new || 'Yeni Ekle'}
                 </Button>
               </CardContent>
             </Card>
           ) : (
             activeHabits.map((habit) => {
-              const isCompleted = todayLogs.some(log => log.habit_id === habit.id)
+              const isCompleted = safeTodayLogs.some(log => log.habit_id === habit.id)
               
               return (
                 <motion.div
@@ -169,7 +188,7 @@ export default function HabitsPage() {
                           {(habit.streak || 0) > 0 && (
                             <span className="inline-flex items-center gap-1 text-xs text-orange-500 mt-1">
                               <Flame className="w-3 h-3" />
-                              {habit.streak} {t.habits.days}
+                              {habit.streak} {t.habits?.days || 'gün'}
                             </span>
                           )}
                         </div>
@@ -264,7 +283,7 @@ function AddHabitModal({
       >
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b shrink-0">
-          <h2 className="text-xl font-bold">{t.habits.add_new}</h2>
+          <h2 className="text-xl font-bold">{t.habits?.add_new || 'Yeni Alışkanlık'}</h2>
           <Button variant="ghost" size="icon" onClick={onClose}>
             <X className="w-5 h-5" />
           </Button>
@@ -273,7 +292,7 @@ function AddHabitModal({
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           <div>
-            <label className="text-sm font-medium mb-2 block">{t.habits.habit_name}</label>
+            <label className="text-sm font-medium mb-2 block">{t.habits?.habit_name || 'Alışkanlık Adı'}</label>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -283,7 +302,7 @@ function AddHabitModal({
           </div>
 
           <div>
-            <label className="text-sm font-medium mb-2 block">{t.habits.icon}</label>
+            <label className="text-sm font-medium mb-2 block">{t.habits?.icon || 'İkon'}</label>
             <div className="grid grid-cols-8 gap-2">
               {HABIT_ICONS.map((i) => (
                 <button
@@ -302,7 +321,7 @@ function AddHabitModal({
           </div>
 
           <div>
-            <label className="text-sm font-medium mb-2 block">{t.habits.color}</label>
+            <label className="text-sm font-medium mb-2 block">{t.habits?.color || 'Renk'}</label>
             <div className="flex flex-wrap gap-2">
               {HABIT_COLORS.map((c) => (
                 <button
@@ -323,10 +342,10 @@ function AddHabitModal({
         {/* Footer */}
         <div className="flex gap-3 p-4 border-t shrink-0">
           <Button variant="outline" className="flex-1" onClick={onClose}>
-            {t.cancel}
+            {t.cancel || 'İptal'}
           </Button>
           <Button className="flex-1" onClick={handleSubmit} disabled={!name.trim() || loading}>
-            {loading ? (language === 'tr' ? 'Ekleniyor...' : 'Adding...') : t.add}
+            {loading ? (language === 'tr' ? 'Ekleniyor...' : 'Adding...') : (t.add || 'Ekle')}
           </Button>
         </div>
       </motion.div>

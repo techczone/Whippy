@@ -43,14 +43,20 @@ export function useGoals(userId: string | undefined) {
   }, [fetchGoals])
 
   // Add goal
-  const addGoal = async (goal: Omit<Goal, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'current_value' | 'status'>) => {
+  const addGoal = async (goal: { name: string; title?: string; description?: string | null; target_value: number; unit: string; deadline?: string | null; category: string }) => {
     if (!userId) return null
 
     try {
       const { data, error } = await supabase
         .from('goals')
         .insert({
-          ...goal,
+          name: goal.name,
+          title: goal.title || goal.name,
+          description: goal.description,
+          target_value: goal.target_value,
+          unit: goal.unit,
+          deadline: goal.deadline,
+          category: goal.category,
           user_id: userId,
           current_value: 0,
           status: 'active',

@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard,
@@ -19,170 +19,133 @@ import {
   Calendar,
   BarChart3,
   User,
+  LogOut,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { useAppStore } from '@/lib/store'
 import { useTranslation } from '@/hooks/use-translation'
+import { useAuth } from '@/hooks/use-auth'
 
 export function Sidebar() {
   const pathname = usePathname()
-  const { sidebarOpen, setSidebarOpen, mobileMenuOpen, setMobileMenuOpen } = useAppStore()
+  const router = useRouter()
+  const { sidebarOpen, setSidebarOpen } = useAppStore()
+  const [mobileOpen, setMobileOpen] = useState(false)
   const { t } = useTranslation()
+  const { user, signOut } = useAuth()
 
-  // Sayfa değiştiğinde mobil menüyü kapat
-  useEffect(() => {
-    setMobileMenuOpen(false)
-  }, [pathname, setMobileMenuOpen])
+  // Get user info
+  const userName = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'Kullanıcı'
+  const userAvatar = user?.user_metadata?.avatar_url || user?.user_metadata?.picture || null
+  const userEmail = user?.email || ''
 
-  // Mobil menü açıkken scroll'u engelle
-  useEffect(() => {
-    if (mobileMenuOpen) {
-      document.body.style.overflow = 'hidden'
-    } else {
-      document.body.style.overflow = ''
-    }
-    return () => {
-      document.body.style.overflow = ''
-    }
-  }, [mobileMenuOpen])
+  const handleSignOut = async () => {
+    await signOut()
+    router.push('/login')
+  }
 
   const NAV_ITEMS = [
-    { label: t.nav.dashboard, href: '/dashboard', icon: LayoutDashboard },
-    { label: t.nav.habits, href: '/habits', icon: Target },
-    { label: t.nav.goals, href: '/goals', icon: TrendingUp },
-    { label: t.nav.health, href: '/health', icon: Heart },
-    { label: t.nav.projects, href: '/projects', icon: FolderKanban },
-    { label: t.nav.coach, href: '/coach', icon: Sparkles },
-    { label: t.nav.reports, href: '/reports', icon: BarChart3 },
-    { label: t.nav.calendar, href: '/calendar', icon: Calendar },
+    {
+      label: t.nav.dashboard,
+      href: '/dashboard',
+      icon: LayoutDashboard,
+    },
+    {
+      label: t.nav.habits,
+      href: '/habits',
+      icon: Target,
+    },
+    {
+      label: t.nav.goals,
+      href: '/goals',
+      icon: TrendingUp,
+    },
+    {
+      label: t.nav.health,
+      href: '/health',
+      icon: Heart,
+    },
+    {
+      label: t.nav.projects,
+      href: '/projects',
+      icon: FolderKanban,
+    },
+    {
+      label: t.nav.coach,
+      href: '/coach',
+      icon: Sparkles,
+    },
+    {
+      label: t.nav.reports,
+      href: '/reports',
+      icon: BarChart3,
+    },
+    {
+      label: t.nav.calendar,
+      href: '/calendar',
+      icon: Calendar,
+    },
   ]
 
   const BOTTOM_NAV_ITEMS = [
-    { label: t.nav.profile, href: '/profile', icon: User },
-    { label: t.nav.settings, href: '/settings', icon: Settings },
+    {
+      label: t.nav.profile,
+      href: '/profile',
+      icon: User,
+    },
+    {
+      label: t.nav.settings,
+      href: '/settings',
+      icon: Settings,
+    },
   ]
 
   return (
     <>
-      {/* Mobile Header */}
-      <header className="fixed top-0 left-0 right-0 h-14 bg-card/95 backdrop-blur-sm border-b border-border z-50 md:hidden flex items-center px-4">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="mr-3"
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-        >
-          {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-        </Button>
-        <Link href="/dashboard" className="flex items-center">
-          <span className="text-xl font-bold bg-gradient-to-r from-orange-400 to-red-500 bg-clip-text text-transparent">
-            Whippy
-          </span>
-        </Link>
-      </header>
+      {/* Mobile menu button */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="fixed top-4 left-4 z-50 md:hidden"
+        onClick={() => setMobileOpen(!mobileOpen)}
+      >
+        {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+      </Button>
 
-      {/* Mobile Overlay */}
+      {/* Mobile overlay */}
       <AnimatePresence>
-        {mobileMenuOpen && (
+        {mobileOpen && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="fixed inset-0 bg-black/60 z-40 md:hidden"
-            onClick={() => setMobileMenuOpen(false)}
+            className="fixed inset-0 bg-black/50 z-40 md:hidden"
+            onClick={() => setMobileOpen(false)}
           />
         )}
       </AnimatePresence>
 
-      {/* Mobile Sidebar - Slide from left */}
-      <AnimatePresence>
-        {mobileMenuOpen && (
-          <motion.aside
-            initial={{ x: '-100%' }}
-            animate={{ x: 0 }}
-            exit={{ x: '-100%' }}
-            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="fixed top-0 left-0 h-full w-72 bg-card border-r border-border z-50 md:hidden flex flex-col"
-          >
-            {/* Mobile Logo */}
-            <div className="h-14 flex items-center px-4 border-b border-border">
-              <Link href="/dashboard" onClick={() => setMobileMenuOpen(false)}>
-                <span className="text-xl font-bold bg-gradient-to-r from-orange-400 to-red-500 bg-clip-text text-transparent">
-                  Whippy
-                </span>
-              </Link>
-              <span className="ml-2 text-xs text-muted-foreground">🔥 Bahane yok</span>
-            </div>
-
-            {/* Mobile Navigation */}
-            <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-              {NAV_ITEMS.map((item) => {
-                const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
-                const Icon = item.icon
-
-                return (
-                  <Link key={item.href} href={item.href} onClick={() => setMobileMenuOpen(false)}>
-                    <div
-                      className={cn(
-                        'flex items-center gap-3 px-4 py-3 rounded-xl transition-all active:scale-[0.98]',
-                        isActive 
-                          ? 'bg-primary text-primary-foreground' 
-                          : 'hover:bg-accent/50 text-muted-foreground hover:text-foreground'
-                      )}
-                    >
-                      <Icon className="w-5 h-5 shrink-0" />
-                      <span className="text-sm font-medium">{item.label}</span>
-                    </div>
-                  </Link>
-                )
-              })}
-            </nav>
-
-            {/* Mobile Bottom Navigation */}
-            <div className="p-3 border-t border-border space-y-1">
-              {BOTTOM_NAV_ITEMS.map((item) => {
-                const isActive = pathname === item.href
-                const Icon = item.icon
-
-                return (
-                  <Link key={item.href} href={item.href} onClick={() => setMobileMenuOpen(false)}>
-                    <div
-                      className={cn(
-                        'flex items-center gap-3 px-4 py-3 rounded-xl transition-all active:scale-[0.98]',
-                        isActive 
-                          ? 'bg-primary text-primary-foreground' 
-                          : 'hover:bg-accent/50 text-muted-foreground hover:text-foreground'
-                      )}
-                    >
-                      <Icon className="w-5 h-5 shrink-0" />
-                      <span className="text-sm font-medium">{item.label}</span>
-                    </div>
-                  </Link>
-                )
-              })}
-            </div>
-          </motion.aside>
-        )}
-      </AnimatePresence>
-
-      {/* Desktop Sidebar */}
+      {/* Sidebar */}
       <motion.aside
         initial={false}
-        animate={{ width: sidebarOpen ? 256 : 80 }}
+        animate={{ 
+          width: sidebarOpen ? 256 : 80,
+          x: mobileOpen ? 0 : undefined
+        }}
         className={cn(
-          'hidden md:flex fixed top-0 left-0 h-full bg-card border-r border-border z-40',
-          'flex-col transition-all duration-300'
+          'fixed top-0 left-0 h-full bg-card border-r border-border z-40',
+          'flex flex-col transition-all duration-300',
+          'md:relative md:translate-x-0',
+          mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         )}
       >
-        {/* Desktop Logo */}
+        {/* Logo */}
         <div className="p-4 border-b border-border">
           <Link href="/dashboard" className="flex items-center">
-            <AnimatePresence mode="wait">
+            <AnimatePresence>
               {sidebarOpen ? (
                 <motion.h1
-                  key="full"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
@@ -192,7 +155,6 @@ export function Sidebar() {
                 </motion.h1>
               ) : (
                 <motion.span
-                  key="short"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
@@ -205,7 +167,40 @@ export function Sidebar() {
           </Link>
         </div>
 
-        {/* Desktop Navigation */}
+        {/* User Info */}
+        {user && (
+          <div className="p-3 border-b border-border">
+            <Link href="/profile">
+              <div className={cn(
+                'flex items-center gap-3 p-2 rounded-xl hover:bg-accent/50 transition-colors',
+                sidebarOpen ? '' : 'justify-center'
+              )}>
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center text-white font-bold overflow-hidden shrink-0">
+                  {userAvatar ? (
+                    <img src={userAvatar} alt={userName} className="w-full h-full object-cover" />
+                  ) : (
+                    userName.charAt(0).toUpperCase()
+                  )}
+                </div>
+                <AnimatePresence>
+                  {sidebarOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, width: 0 }}
+                      animate={{ opacity: 1, width: 'auto' }}
+                      exit={{ opacity: 0, width: 0 }}
+                      className="overflow-hidden"
+                    >
+                      <p className="text-sm font-medium truncate max-w-[140px]">{userName}</p>
+                      <p className="text-xs text-muted-foreground truncate max-w-[140px]">{userEmail}</p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </Link>
+          </div>
+        )}
+
+        {/* Navigation */}
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
           {NAV_ITEMS.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
@@ -242,7 +237,7 @@ export function Sidebar() {
           })}
         </nav>
 
-        {/* Desktop Bottom Navigation */}
+        {/* Bottom navigation */}
         <div className="p-3 border-t border-border space-y-1">
           {BOTTOM_NAV_ITEMS.map((item) => {
             const isActive = pathname === item.href
@@ -277,15 +272,42 @@ export function Sidebar() {
               </Link>
             )
           })}
+
+          {/* Sign Out Button */}
+          {user && (
+            <motion.button
+              onClick={handleSignOut}
+              className={cn(
+                'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all',
+                'hover:bg-red-500/10 text-muted-foreground hover:text-red-500'
+              )}
+              whileHover={{ x: 4 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <LogOut className="w-5 h-5 shrink-0" />
+              <AnimatePresence>
+                {sidebarOpen && (
+                  <motion.span
+                    initial={{ opacity: 0, width: 0 }}
+                    animate={{ opacity: 1, width: 'auto' }}
+                    exit={{ opacity: 0, width: 0 }}
+                    className="text-sm font-medium whitespace-nowrap overflow-hidden"
+                  >
+                    Çıkış Yap
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </motion.button>
+          )}
         </div>
 
-        {/* Desktop Toggle Button */}
+        {/* Toggle button */}
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
           className={cn(
-            'absolute -right-3 top-1/2 -translate-y-1/2',
+            'hidden md:flex absolute -right-3 top-1/2 -translate-y-1/2',
             'w-6 h-6 rounded-full bg-card border border-border shadow-sm',
-            'flex items-center justify-center hover:bg-accent transition-colors'
+            'items-center justify-center hover:bg-accent transition-colors'
           )}
         >
           {sidebarOpen ? (
@@ -299,7 +321,7 @@ export function Sidebar() {
   )
 }
 
-// Mobile bottom navigation - Quick access to main features
+// Mobile bottom navigation
 export function MobileBottomNav() {
   const pathname = usePathname()
   const { t } = useTranslation()
@@ -307,14 +329,14 @@ export function MobileBottomNav() {
   const mobileItems = [
     { label: t.nav.dashboard, href: '/dashboard', icon: LayoutDashboard },
     { label: t.nav.habits, href: '/habits', icon: Target },
-    { label: t.nav.coach, href: '/coach', icon: Sparkles },
     { label: t.nav.health, href: '/health', icon: Heart },
+    { label: t.nav.coach, href: '/coach', icon: Sparkles },
     { label: t.nav.profile, href: '/profile', icon: User },
   ]
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-card/95 backdrop-blur-sm border-t border-border md:hidden z-40 safe-area-bottom">
-      <div className="flex items-center justify-around py-2 px-1">
+    <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border md:hidden z-40">
+      <div className="flex items-center justify-around py-2">
         {mobileItems.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
           const Icon = item.icon
@@ -324,19 +346,12 @@ export function MobileBottomNav() {
               key={item.href}
               href={item.href}
               className={cn(
-                'flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg transition-all min-w-[60px] active:scale-95',
-                isActive 
-                  ? 'text-primary' 
-                  : 'text-muted-foreground active:text-foreground'
+                'flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors',
+                isActive ? 'text-primary' : 'text-muted-foreground'
               )}
             >
-              <Icon className={cn('w-5 h-5', isActive && 'text-primary')} />
-              <span className={cn(
-                'text-[10px] font-medium',
-                isActive && 'text-primary'
-              )}>
-                {item.label}
-              </span>
+              <Icon className="w-5 h-5" />
+              <span className="text-[10px] font-medium">{item.label}</span>
             </Link>
           )
         })}

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { 
   User, 
@@ -14,71 +14,221 @@ import {
   Edit2,
   Save,
   X,
-  LogOut
+  Heart
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Progress } from '@/components/ui/progress'
 import { useAuth } from '@/hooks/use-auth'
-import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
+import toast from 'react-hot-toast'
 
-const demoStats = {
-  totalHabitsCompleted: 234,
-  currentStreak: 12,
-  longestStreak: 21,
-  goalsCompleted: 5,
-  totalDaysActive: 45,
-  averageScore: 72,
-}
-
-const demoAchievements = [
-  { id: '1', name: 'İlk Adım', icon: '🌟', description: 'İlk alışkanlığını tamamla', unlocked: true },
-  { id: '2', name: 'Tutarlı Başlangıç', icon: '🔥', description: '7 günlük seri', unlocked: true },
-  { id: '3', name: 'Su Canavarı', icon: '💧', description: '7 gün üst üste 2.5L su iç', unlocked: true },
-  { id: '4', name: 'Alışkanlık Ustası', icon: '⚡', description: '30 günlük seri', unlocked: false },
-  { id: '5', name: 'Hedef Avcısı', icon: '🎯', description: 'İlk hedefini tamamla', unlocked: true },
-  { id: '6', name: 'Efsane Seri', icon: '👑', description: '100 günlük seri', unlocked: false },
+// Tüm başarılar (achievements tablosundan çekilebilir ama statik de olabilir)
+const ALL_ACHIEVEMENTS = [
+  { id: 'first_habit', name: 'İlk Adım', icon: '🌟', description: 'İlk alışkanlığını tamamla', condition: (s: any) => s.totalHabitsCompleted >= 1 },
+  { id: 'streak_7', name: 'Tutarlı Başlangıç', icon: '🔥', description: '7 günlük seri', condition: (s: any) => s.currentStreak >= 7 },
+  { id: 'water_master', name: 'Su Canavarı', icon: '💧', description: '7 gün üst üste 2.5L su iç', condition: (s: any) => s.waterStreak >= 7 },
+  { id: 'streak_30', name: 'Alışkanlık Ustası', icon: '⚡', description: '30 günlük seri', condition: (s: any) => s.currentStreak >= 30 },
+  { id: 'first_goal', name: 'Hedef Avcısı', icon: '🎯', description: 'İlk hedefini tamamla', condition: (s: any) => s.goalsCompleted >= 1 },
+  { id: 'streak_100', name: 'Efsane Seri', icon: '👑', description: '100 günlük seri', condition: (s: any) => s.currentStreak >= 100 },
+  { id: 'habits_50', name: 'Kararlı', icon: '💪', description: '50 alışkanlık tamamla', condition: (s: any) => s.totalHabitsCompleted >= 50 },
+  { id: 'habits_100', name: 'Disiplinli', icon: '🏆', description: '100 alışkanlık tamamla', condition: (s: any) => s.totalHabitsCompleted >= 100 },
+  { id: 'goals_5', name: 'Hedef Makinesi', icon: '🚀', description: '5 hedef tamamla', condition: (s: any) => s.goalsCompleted >= 5 },
+  { id: 'active_30', name: 'Sadık Kullanıcı', icon: '📅', description: '30 gün aktif ol', condition: (s: any) => s.totalDaysActive >= 30 },
+  { id: 'health_week', name: 'Sağlık Takipçisi', icon: '❤️', description: '7 gün sağlık verisi gir', condition: (s: any) => s.healthDays >= 7 },
+  { id: 'mood_week', name: 'Kendini Tanı', icon: '😊', description: '7 gün ruh hali kaydet', condition: (s: any) => s.moodDays >= 7 },
 ]
 
 export default function ProfilePage() {
-  const { user, profile, subscription, signOut, loading } = useAuth()
-  const router = useRouter()
+  const { user } = useAuth()
+  const userId = user?.id
+  
+  const [loading, setLoading] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
-  const [name, setName] = useState('')
+  const [profile, setProfile] = useState<any>(null)
   const [tempName, setTempName] = useState('')
+  const [stats, setStats] = useState({
+    totalHabitsCompleted: 0,
+    currentStreak: 0,
+    longestStreak: 0,
+    goalsCompleted: 0,
+    totalDaysActive: 0,
+    averageScore: 0,
+    waterStreak: 0,
+    healthDays: 0,
+    moodDays: 0,
+  })
 
+  const supabase = useMemo(() => createClient(), [])
+
+  // Fetch profile and stats
   useEffect(() => {
-    if (user) {
-      const displayName = user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || 'Kullanıcı'
-      setName(displayName)
-      setTempName(displayName)
+    if (!userId) {
+      setLoading(false)
+      return
     }
-  }, [user])
 
-  const handleSave = () => {
-    setName(tempName)
-    setIsEditing(false)
+    const fetchData = async () => {
+      setLoading(true)
+      
+      try {
+        // Fetch profile
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .single()
+
+        if (profileData) {
+          setProfile(profileData)
+          setTempName(profileData.full_name || user?.email?.split('@')[0] || '')
+        }
+
+        // Fetch habit logs (completed)
+        const { data: habitLogs } = await supabase
+          .from('habit_logs')
+          .select('date, completed')
+          .eq('user_id', userId)
+          .eq('completed', true)
+
+        const totalHabitsCompleted = habitLogs?.length || 0
+        
+        // Calculate streak
+        const uniqueDates = [...new Set(habitLogs?.map(l => l.date) || [])].sort().reverse()
+        let currentStreak = 0
+        let longestStreak = 0
+        let tempStreak = 0
+        
+        const today = new Date().toISOString().split('T')[0]
+        const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0]
+        
+        // Current streak
+        if (uniqueDates.includes(today) || uniqueDates.includes(yesterday)) {
+          for (let i = 0; i < uniqueDates.length; i++) {
+            const expectedDate = new Date(Date.now() - (i * 86400000)).toISOString().split('T')[0]
+            if (uniqueDates.includes(expectedDate)) {
+              currentStreak++
+            } else if (i === 0 && !uniqueDates.includes(today)) {
+              // Bugün yoksa dünden başla
+              continue
+            } else {
+              break
+            }
+          }
+        }
+
+        // Longest streak calculation
+        for (let i = 0; i < uniqueDates.length; i++) {
+          if (i === 0) {
+            tempStreak = 1
+          } else {
+            const prevDate = new Date(uniqueDates[i - 1])
+            const currDate = new Date(uniqueDates[i])
+            const diff = (prevDate.getTime() - currDate.getTime()) / 86400000
+            
+            if (diff === 1) {
+              tempStreak++
+            } else {
+              longestStreak = Math.max(longestStreak, tempStreak)
+              tempStreak = 1
+            }
+          }
+        }
+        longestStreak = Math.max(longestStreak, tempStreak, currentStreak)
+
+        // Fetch completed goals
+        const { data: goals } = await supabase
+          .from('goals')
+          .select('status')
+          .eq('user_id', userId)
+
+        const goalsCompleted = goals?.filter(g => g.status === 'completed').length || 0
+
+        // Total active days (unique dates with any activity)
+        const totalDaysActive = uniqueDates.length
+
+        // Fetch health entries count
+        const { data: healthEntries } = await supabase
+          .from('health_entries')
+          .select('date')
+          .eq('user_id', userId)
+
+        const healthDays = healthEntries?.length || 0
+
+        // Fetch mood entries count
+        const { data: moodEntries } = await supabase
+          .from('mood_entries')
+          .select('date')
+          .eq('user_id', userId)
+
+        const moodDays = moodEntries?.length || 0
+
+        // Calculate average score (based on completion rate)
+        const averageScore = totalDaysActive > 0 
+          ? Math.round((totalHabitsCompleted / (totalDaysActive * 3)) * 100) // Assuming ~3 habits average
+          : 0
+
+        setStats({
+          totalHabitsCompleted,
+          currentStreak,
+          longestStreak,
+          goalsCompleted,
+          totalDaysActive,
+          averageScore: Math.min(100, averageScore),
+          waterStreak: 0, // TODO: Calculate from health_entries
+          healthDays,
+          moodDays,
+        })
+
+      } catch (err) {
+        console.error('Error fetching profile data:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [userId, supabase, user])
+
+  // Calculate unlocked achievements
+  const achievements = useMemo(() => {
+    return ALL_ACHIEVEMENTS.map(a => ({
+      ...a,
+      unlocked: a.condition(stats)
+    }))
+  }, [stats])
+
+  const unlockedCount = achievements.filter(a => a.unlocked).length
+  const totalAchievements = achievements.length
+
+  const handleSave = async () => {
+    if (!userId) return
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ full_name: tempName })
+        .eq('id', userId)
+
+      if (error) throw error
+
+      setProfile((prev: any) => ({ ...prev, full_name: tempName }))
+      setIsEditing(false)
+      toast.success('Profil güncellendi!')
+    } catch (err) {
+      console.error('Error updating profile:', err)
+      toast.error('Güncelleme başarısız')
+    }
   }
 
   const handleCancel = () => {
-    setTempName(name)
+    setTempName(profile?.full_name || '')
     setIsEditing(false)
   }
 
-  const handleSignOut = async () => {
-    await signOut()
-    router.push('/login')
-  }
-
-  const unlockedCount = demoAchievements.filter(a => a.unlocked).length
-  const totalAchievements = demoAchievements.length
-
-  // Get user info
-  const userEmail = user?.email || 'email@example.com'
-  const userAvatar = user?.user_metadata?.avatar_url || user?.user_metadata?.picture || null
-  const userTier = subscription?.tier || 'free'
-  const joinDate = user?.created_at ? new Date(user.created_at).toLocaleDateString('tr-TR', { year: 'numeric', month: 'long', day: 'numeric' }) : ''
+  const displayName = profile?.full_name || user?.email?.split('@')[0] || 'Kullanıcı'
+  const joinDate = profile?.created_at || user?.created_at
 
   if (loading) {
     return (
@@ -91,18 +241,12 @@ export default function ProfilePage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <User className="w-7 h-7 text-primary" />
-            Profil
-          </h1>
-          <p className="text-muted-foreground">Hesap bilgilerin ve başarıların</p>
-        </div>
-        <Button variant="outline" onClick={handleSignOut} className="text-red-500 hover:text-red-600">
-          <LogOut className="w-4 h-4 mr-2" />
-          Çıkış Yap
-        </Button>
+      <div>
+        <h1 className="text-2xl font-bold flex items-center gap-2">
+          <User className="w-7 h-7 text-primary" />
+          Profil
+        </h1>
+        <p className="text-muted-foreground">Hesap bilgilerin ve başarıların</p>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
@@ -112,198 +256,199 @@ export default function ProfilePage() {
             <div className="flex flex-col items-center text-center">
               {/* Avatar */}
               <div className="relative mb-4">
-                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center text-white text-3xl font-bold overflow-hidden">
-                  {userAvatar ? (
-                    <img src={userAvatar} alt={name} className="w-full h-full object-cover" />
-                  ) : (
-                    name.charAt(0).toUpperCase()
-                  )}
+                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-4xl text-white font-bold">
+                  {displayName.charAt(0).toUpperCase()}
                 </div>
-                <button className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-card border border-border flex items-center justify-center hover:bg-accent transition-colors">
+                <button className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-secondary border-2 border-background flex items-center justify-center hover:bg-accent transition-colors">
                   <Camera className="w-4 h-4" />
                 </button>
               </div>
 
               {/* Name */}
-              <div className="flex items-center gap-2 mb-1">
-                {isEditing ? (
-                  <div className="flex items-center gap-2">
-                    <Input
-                      value={tempName}
-                      onChange={(e) => setTempName(e.target.value)}
-                      className="h-8 w-40 text-center"
-                    />
-                    <button onClick={handleSave} className="text-green-500 hover:text-green-600">
-                      <Save className="w-4 h-4" />
-                    </button>
-                    <button onClick={handleCancel} className="text-red-500 hover:text-red-600">
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <>
-                    <h2 className="text-xl font-semibold">{name}</h2>
-                    <button onClick={() => setIsEditing(true)} className="text-muted-foreground hover:text-foreground">
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                  </>
-                )}
-              </div>
+              {isEditing ? (
+                <div className="flex items-center gap-2 mb-2">
+                  <Input
+                    value={tempName}
+                    onChange={(e) => setTempName(e.target.value)}
+                    className="text-center"
+                  />
+                  <Button size="icon" variant="ghost" onClick={handleSave}>
+                    <Save className="w-4 h-4 text-green-500" />
+                  </Button>
+                  <Button size="icon" variant="ghost" onClick={handleCancel}>
+                    <X className="w-4 h-4 text-red-500" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 mb-2">
+                  <h2 className="text-xl font-bold">{displayName}</h2>
+                  <button onClick={() => { setTempName(displayName); setIsEditing(true); }}>
+                    <Edit2 className="w-4 h-4 text-muted-foreground hover:text-foreground" />
+                  </button>
+                </div>
+              )}
 
               {/* Email */}
-              <div className="flex items-center gap-1 text-muted-foreground text-sm mb-3">
+              <p className="text-sm text-muted-foreground flex items-center gap-1 mb-4">
                 <Mail className="w-4 h-4" />
-                {userEmail}
-              </div>
+                {user?.email}
+              </p>
 
               {/* Tier Badge */}
-              <div className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium mb-3 ${
-                userTier === 'elite' 
-                  ? 'bg-purple-500/10 text-purple-500 border border-purple-500/20'
-                  : userTier === 'pro'
-                  ? 'bg-orange-500/10 text-orange-500 border border-orange-500/20'
-                  : 'bg-muted text-muted-foreground'
-              }`}>
-                {userTier === 'elite' ? '👑' : userTier === 'pro' ? '⭐' : '🆓'}
-                {userTier === 'elite' ? 'Elite Plan' : userTier === 'pro' ? 'Pro Plan' : 'Ücretsiz Plan'}
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-secondary text-sm font-medium mb-4">
+                🆓 Ücretsiz Plan
               </div>
 
               {/* Join Date */}
               {joinDate && (
-                <div className="flex items-center gap-1 text-muted-foreground text-xs">
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
                   <Calendar className="w-3 h-3" />
-                  {joinDate} tarihinde katıldı
-                </div>
+                  {new Date(joinDate).toLocaleDateString('tr-TR', { 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                  })} tarihinde katıldı
+                </p>
               )}
 
               {/* Upgrade Button */}
-              {userTier === 'free' && (
-                <Button className="w-full mt-4 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600">
-                  Pro'ya Yükselt
-                </Button>
-              )}
+              <Button className="w-full mt-6 bg-gradient-to-r from-primary to-accent">
+                Pro'ya Yükselt
+              </Button>
             </div>
           </CardContent>
         </Card>
 
-        {/* Stats Grid */}
-        <div className="lg:col-span-2 grid sm:grid-cols-3 gap-4">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex flex-col items-center text-center">
-                <div className="w-12 h-12 rounded-xl bg-orange-500/10 flex items-center justify-center mb-3">
-                  <Target className="w-6 h-6 text-orange-500" />
-                </div>
-                <div className="text-3xl font-bold">{demoStats.totalHabitsCompleted}</div>
-                <div className="text-sm text-muted-foreground">Tamamlanan Alışkanlık</div>
-              </div>
-            </CardContent>
-          </Card>
+        {/* Stats & Achievements */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Stats Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+            >
+              <Card>
+                <CardContent className="pt-4 text-center">
+                  <Target className="w-8 h-8 mx-auto mb-2 text-primary" />
+                  <p className="text-2xl font-bold">{stats.totalHabitsCompleted}</p>
+                  <p className="text-xs text-muted-foreground">Tamamlanan Alışkanlık</p>
+                </CardContent>
+              </Card>
+            </motion.div>
 
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex flex-col items-center text-center">
-                <div className="w-12 h-12 rounded-xl bg-red-500/10 flex items-center justify-center mb-3">
-                  <Flame className="w-6 h-6 text-red-500" />
-                </div>
-                <div className="text-3xl font-bold">{demoStats.currentStreak}</div>
-                <div className="text-sm text-muted-foreground">Güncel Seri</div>
-              </div>
-            </CardContent>
-          </Card>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+            >
+              <Card>
+                <CardContent className="pt-4 text-center">
+                  <Flame className="w-8 h-8 mx-auto mb-2 text-orange-500" />
+                  <p className="text-2xl font-bold">{stats.currentStreak}</p>
+                  <p className="text-xs text-muted-foreground">Güncel Seri</p>
+                </CardContent>
+              </Card>
+            </motion.div>
 
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex flex-col items-center text-center">
-                <div className="w-12 h-12 rounded-xl bg-yellow-500/10 flex items-center justify-center mb-3">
-                  <Trophy className="w-6 h-6 text-yellow-500" />
-                </div>
-                <div className="text-3xl font-bold">{demoStats.longestStreak}</div>
-                <div className="text-sm text-muted-foreground">En Uzun Seri</div>
-              </div>
-            </CardContent>
-          </Card>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+            >
+              <Card>
+                <CardContent className="pt-4 text-center">
+                  <Trophy className="w-8 h-8 mx-auto mb-2 text-yellow-500" />
+                  <p className="text-2xl font-bold">{stats.longestStreak}</p>
+                  <p className="text-xs text-muted-foreground">En Uzun Seri</p>
+                </CardContent>
+              </Card>
+            </motion.div>
 
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex flex-col items-center text-center">
-                <div className="w-12 h-12 rounded-xl bg-green-500/10 flex items-center justify-center mb-3">
-                  <TrendingUp className="w-6 h-6 text-green-500" />
-                </div>
-                <div className="text-3xl font-bold">{demoStats.goalsCompleted}</div>
-                <div className="text-sm text-muted-foreground">Tamamlanan Hedef</div>
-              </div>
-            </CardContent>
-          </Card>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
+            >
+              <Card>
+                <CardContent className="pt-4 text-center">
+                  <TrendingUp className="w-8 h-8 mx-auto mb-2 text-green-500" />
+                  <p className="text-2xl font-bold">{stats.goalsCompleted}</p>
+                  <p className="text-xs text-muted-foreground">Tamamlanan Hedef</p>
+                </CardContent>
+              </Card>
+            </motion.div>
 
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex flex-col items-center text-center">
-                <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center mb-3">
-                  <Calendar className="w-6 h-6 text-blue-500" />
-                </div>
-                <div className="text-3xl font-bold">{demoStats.totalDaysActive}</div>
-                <div className="text-sm text-muted-foreground">Aktif Gün</div>
-              </div>
-            </CardContent>
-          </Card>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+            >
+              <Card>
+                <CardContent className="pt-4 text-center">
+                  <Calendar className="w-8 h-8 mx-auto mb-2 text-blue-500" />
+                  <p className="text-2xl font-bold">{stats.totalDaysActive}</p>
+                  <p className="text-xs text-muted-foreground">Aktif Gün</p>
+                </CardContent>
+              </Card>
+            </motion.div>
 
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.6 }}
+            >
+              <Card>
+                <CardContent className="pt-4 text-center">
+                  <Heart className="w-8 h-8 mx-auto mb-2 text-red-500" />
+                  <p className="text-2xl font-bold">{stats.healthDays}</p>
+                  <p className="text-xs text-muted-foreground">Sağlık Kaydı</p>
+                </CardContent>
+              </Card>
+            </motion.div>
+          </div>
+
+          {/* Achievements */}
           <Card>
-            <CardContent className="pt-6">
-              <div className="flex flex-col items-center text-center">
-                <div className="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center mb-3">
-                  <div className="text-purple-500 font-bold">%</div>
-                </div>
-                <div className="text-3xl font-bold">{demoStats.averageScore}</div>
-                <div className="text-sm text-muted-foreground">Ortalama Skor</div>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Trophy className="w-5 h-5 text-yellow-500" />
+                  Başarılar
+                </CardTitle>
+                <span className="text-sm text-muted-foreground">
+                  {unlockedCount}/{totalAchievements}
+                </span>
+              </div>
+              <Progress value={(unlockedCount / totalAchievements) * 100} className="h-2" />
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {achievements.map((achievement) => (
+                  <motion.div
+                    key={achievement.id}
+                    whileHover={{ scale: 1.02 }}
+                    className={`p-3 rounded-xl border ${
+                      achievement.unlocked 
+                        ? 'bg-secondary/50 border-primary/30' 
+                        : 'bg-secondary/20 border-border opacity-50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-2xl">{achievement.icon}</span>
+                      <span className="font-medium text-sm">{achievement.name}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{achievement.description}</p>
+                    {achievement.unlocked && (
+                      <span className="text-xs text-green-500 mt-1 block">✓ Kazanıldı</span>
+                    )}
+                  </motion.div>
+                ))}
               </div>
             </CardContent>
           </Card>
         </div>
       </div>
-
-      {/* Achievements */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <Trophy className="w-5 h-5 text-yellow-500" />
-              Başarılar
-            </CardTitle>
-            <div className="flex items-center gap-2">
-              <Progress value={(unlockedCount / totalAchievements) * 100} className="w-32 h-2" />
-              <span className="text-sm text-muted-foreground">{unlockedCount}/{totalAchievements}</span>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {demoAchievements.map((achievement) => (
-              <motion.div
-                key={achievement.id}
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className={`p-4 rounded-xl border ${
-                  achievement.unlocked 
-                    ? 'bg-card border-orange-500/20' 
-                    : 'bg-muted/30 border-border opacity-50'
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  <div className="text-2xl">{achievement.icon}</div>
-                  <div>
-                    <h4 className="font-medium">{achievement.name}</h4>
-                    <p className="text-xs text-muted-foreground">{achievement.description}</p>
-                    {achievement.unlocked && (
-                      <span className="text-xs text-green-500">✓ Kazanıldı</span>
-                    )}
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
     </div>
   )
 }

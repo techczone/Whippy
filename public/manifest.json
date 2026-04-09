@@ -1,15 +1,14 @@
 {
-  "name": "Whippy - Acımasız AI Yaşam Koçu",
+  "name": "Whippy - AI Yaşam Koçun",
   "short_name": "Whippy",
-  "description": "Bahane yok, sadece sonuç! AI destekli yaşam koçunuz.",
+  "description": "Acımasız AI yaşam koçunuz. Alışkanlık takibi, hedef yönetimi ve daha fazlası.",
   "start_url": "/dashboard",
   "display": "standalone",
-  "background_color": "#0a0a0b",
+  "background_color": "#0a0a0a",
   "theme_color": "#f97316",
   "orientation": "portrait-primary",
   "scope": "/",
   "lang": "tr",
-  "categories": ["lifestyle", "health", "productivity"],
   "icons": [
     {
       "src": "/icons/icon-72x72.png",
@@ -63,26 +62,38 @@
   "screenshots": [
     {
       "src": "/screenshots/dashboard.png",
-      "sizes": "1080x1920",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Dashboard"
+    },
+    {
+      "src": "/screenshots/mobile.png",
+      "sizes": "390x844",
       "type": "image/png",
       "form_factor": "narrow",
-      "label": "Dashboard"
+      "label": "Mobile Dashboard"
     }
   ],
+  "categories": ["productivity", "lifestyle", "health"],
   "shortcuts": [
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "url": "/dashboard",
+      "icons": [{ "src": "/icons/dashboard.png", "sizes": "96x96" }]
+    },
     {
       "name": "AI Koç",
       "short_name": "Koç",
-      "description": "AI Koçunuzla konuşun",
       "url": "/coach",
-      "icons": [{ "src": "/icons/icon-96x96.png", "sizes": "96x96" }]
+      "icons": [{ "src": "/icons/coach.png", "sizes": "96x96" }]
     },
     {
       "name": "Alışkanlıklar",
-      "short_name": "Alışkanlıklar",
-      "description": "Günlük alışkanlıklarınız",
+      "short_name": "Habits",
       "url": "/habits",
-      "icons": [{ "src": "/icons/icon-96x96.png", "sizes": "96x96" }]
+      "icons": [{ "src": "/icons/habits.png", "sizes": "96x96" }]
     }
   ]
 }

@@ -2,24 +2,157 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { 
-  Sparkles, 
+  Brain, 
   Target, 
   TrendingUp, 
-  Flame,
-  Heart,
-  Brain,
-  Zap,
-  ChevronRight,
+  Heart, 
+  Flame, 
+  Eye,
   Check,
-  Star,
   ArrowRight,
+  Star,
+  Zap,
   Menu,
-  X
+  X,
+  ChevronDown,
+  Smartphone
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
+import { Card, CardContent } from '@/components/ui/card'
+
+const FEATURES = [
+  {
+    icon: Target,
+    title: 'Alışkanlık Takibi',
+    description: 'Günlük alışkanlıklarını oluştur, takip et ve seri rekorlarını kır.',
+    color: 'from-orange-500 to-red-500',
+  },
+  {
+    icon: Brain,
+    title: 'AI Yaşam Koçu',
+    description: 'Acımasız veya nazik - kişiselleştirilmiş gerçek zamanlı analiz.',
+    color: 'from-purple-500 to-pink-500',
+  },
+  {
+    icon: TrendingUp,
+    title: 'İlerleme Analizi',
+    description: 'Detaylı grafikler ve haftalık raporlarla gelişimini gör.',
+    color: 'from-amber-500 to-orange-500',
+  },
+  {
+    icon: Heart,
+    title: 'Sağlık Metrikleri',
+    description: 'Uyku, egzersiz, su tüketimi ve ruh halini kaydet.',
+    color: 'from-pink-500 to-rose-500',
+  },
+  {
+    icon: Zap,
+    title: 'Hedef Yönetimi',
+    description: 'Büyük hedeflerini küçük adımlara böl ve takip et.',
+    color: 'from-yellow-500 to-amber-500',
+  },
+  {
+    icon: Smartphone,
+    title: 'Her Yerde Erişim',
+    description: 'Mobil ve masaüstünde senkronize çalışan PWA uygulaması.',
+    color: 'from-blue-500 to-cyan-500',
+  },
+]
+
+const COACH_MODES = [
+  {
+    icon: Heart,
+    name: 'Nazik Mod',
+    description: 'Destekleyici, motive edici ve anlayışlı geri bildirimler. Küçük adımları kutlar.',
+    color: 'bg-green-500/20 text-green-500 border-green-500/30',
+    emoji: '💚',
+    example: '"Bugün 3 alışkanlık tamamladın, harika gidiyorsun! 🌟"',
+  },
+  {
+    icon: Flame,
+    name: 'Acımasız Mod',
+    description: 'Direkt, sert ve bahane kabul etmeyen yaklaşım. Sonuç odaklı.',
+    color: 'bg-red-500/20 text-red-500 border-red-500/30',
+    emoji: '🔥',
+    example: '"Geçen hafta da aynı bahaneyi söyledin. Eyleme geç!"',
+  },
+  {
+    icon: Eye,
+    name: '6 Ay Tahmini',
+    description: 'Mevcut verilerle geleceğe dönük senaryo analizi ve tahminler.',
+    color: 'bg-purple-500/20 text-purple-500 border-purple-500/30',
+    emoji: '🔮',
+    example: '"Bu tempoyla 6 ay sonra hedefinin %80\'ine ulaşırsın."',
+  },
+]
+
+const PRICING = [
+  {
+    name: 'Ücretsiz',
+    price: '₺0',
+    period: '/ay',
+    description: 'Başlamak için ideal',
+    features: [
+      'Sınırsız alışkanlık takibi',
+      'Sınırsız hedef belirleme',
+      'AI koç (Groq destekli)',
+      'Tüm koç modları',
+      'Sağlık takibi',
+      'Raporlar & Takvim',
+    ],
+    cta: 'Ücretsiz Başla',
+    href: '/signup',
+    popular: true,
+  },
+  {
+    name: 'Pro',
+    price: '₺99',
+    period: '/ay',
+    description: 'Gelişmiş özellikler',
+    features: [
+      'Ücretsiz\'deki her şey',
+      'Öncelikli AI yanıtları',
+      'Email bildirimleri',
+      'Veri dışa aktarma',
+      'Öncelikli destek',
+      'Yakında: Takım özellikleri',
+    ],
+    cta: 'Yakında',
+    href: '#',
+    popular: false,
+    disabled: true,
+  },
+]
+
+const TESTIMONIALS = [
+  {
+    quote: 'Acımasız mod sayesinde 3 ayda 15 kilo verdim. Bahanelere artık yer yok!',
+    author: 'Mehmet K.',
+    role: 'Yazılım Mühendisi',
+    avatar: '👨‍💻',
+  },
+  {
+    quote: '6 ay tahmini özelliği gözlerimi açtı. Şimdi her gün daha bilinçli yaşıyorum.',
+    author: 'Ayşe T.',
+    role: 'Girişimci',
+    avatar: '👩‍💼',
+  },
+  {
+    quote: 'Alışkanlık takibi ile 100 günlük seri yaptım. Bu uygulama hayatımı değiştirdi.',
+    author: 'Can B.',
+    role: 'Öğrenci',
+    avatar: '👨‍🎓',
+  },
+]
+
+const STATS = [
+  { value: '1,000+', label: 'Aktif Kullanıcı' },
+  { value: '50,000+', label: 'Tamamlanan Alışkanlık' },
+  { value: '98%', label: 'Memnuniyet' },
+  { value: '24/7', label: 'AI Koç' },
+]
 
 export default function LandingPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -33,505 +166,399 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Navigation */}
-      <nav className={cn(
-        'fixed top-0 left-0 right-0 z-50 transition-all duration-300',
-        scrolled ? 'bg-background/80 backdrop-blur-xl border-b border-border' : 'bg-transparent'
-      )}>
-        <div className="container mx-auto px-4">
-          <div className="flex items-center justify-between h-16">
-            <Link href="/" className="flex items-center gap-2">
-              <span className="text-2xl font-bold bg-gradient-to-r from-orange-400 to-red-500 bg-clip-text text-transparent">
-                Whippy
-              </span>
-              <span className="text-xs text-muted-foreground hidden sm:block">🔥 Bahane yok</span>
+      {/* Header */}
+      <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+        scrolled ? 'bg-background/95 backdrop-blur-lg border-b border-border shadow-sm' : 'bg-transparent'
+      }`}>
+        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-2">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center shadow-lg shadow-orange-500/30">
+              <span className="text-lg">🔥</span>
+            </div>
+            <span className="font-bold text-xl bg-gradient-to-r from-orange-400 to-red-500 bg-clip-text text-transparent">Whippy</span>
+          </Link>
+
+          {/* Desktop Nav */}
+          <nav className="hidden md:flex items-center gap-6">
+            <Link href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              Özellikler
             </Link>
-
-            {/* Desktop Nav */}
-            <div className="hidden md:flex items-center gap-8">
-              <a href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Özellikler</a>
-              <a href="#how-it-works" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Nasıl Çalışır</a>
-              <a href="#pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Fiyatlandırma</a>
-            </div>
-
-            <div className="hidden md:flex items-center gap-3">
-              <Button variant="ghost" asChild>
-                <Link href="/login">Giriş Yap</Link>
+            <Link href="#how-it-works" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              Nasıl Çalışır
+            </Link>
+            <Link href="#pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              Fiyatlar
+            </Link>
+            <Link href="/login" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              Giriş
+            </Link>
+            <Link href="/signup">
+              <Button size="sm" className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700">
+                Ücretsiz Başla
               </Button>
-              <Button asChild className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600">
-                <Link href="/signup">Ücretsiz Başla</Link>
-              </Button>
-            </div>
+            </Link>
+          </nav>
 
-            {/* Mobile Menu Button */}
-            <button 
-              className="md:hidden p-2"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            >
-              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-            </button>
-          </div>
+          {/* Mobile Menu Button */}
+          <button 
+            className="md:hidden p-2"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          >
+            {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+          </button>
         </div>
 
         {/* Mobile Menu */}
-        {mobileMenuOpen && (
-          <motion.div 
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="md:hidden bg-background border-b border-border"
-          >
-            <div className="container mx-auto px-4 py-4 space-y-4">
-              <a href="#features" className="block text-muted-foreground" onClick={() => setMobileMenuOpen(false)}>Özellikler</a>
-              <a href="#how-it-works" className="block text-muted-foreground" onClick={() => setMobileMenuOpen(false)}>Nasıl Çalışır</a>
-              <a href="#pricing" className="block text-muted-foreground" onClick={() => setMobileMenuOpen(false)}>Fiyatlandırma</a>
-              <div className="flex gap-3 pt-4 border-t border-border">
-                <Button variant="outline" asChild className="flex-1">
-                  <Link href="/login">Giriş Yap</Link>
-                </Button>
-                <Button asChild className="flex-1 bg-gradient-to-r from-orange-500 to-red-500">
-                  <Link href="/signup">Ücretsiz Başla</Link>
-                </Button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </nav>
+        <AnimatePresence>
+          {mobileMenuOpen && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="md:hidden bg-background border-b border-border"
+            >
+              <nav className="flex flex-col p-4 gap-4">
+                <Link href="#features" className="text-foreground py-2" onClick={() => setMobileMenuOpen(false)}>
+                  Özellikler
+                </Link>
+                <Link href="#how-it-works" className="text-foreground py-2" onClick={() => setMobileMenuOpen(false)}>
+                  Nasıl Çalışır
+                </Link>
+                <Link href="#pricing" className="text-foreground py-2" onClick={() => setMobileMenuOpen(false)}>
+                  Fiyatlar
+                </Link>
+                <Link href="/login" className="text-foreground py-2" onClick={() => setMobileMenuOpen(false)}>
+                  Giriş
+                </Link>
+                <Link href="/signup" onClick={() => setMobileMenuOpen(false)}>
+                  <Button className="w-full bg-gradient-to-r from-orange-500 to-red-600">
+                    Ücretsiz Başla
+                  </Button>
+                </Link>
+              </nav>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </header>
 
-      {/* Hero Section */}
-      <section className="relative pt-32 pb-20 px-4 overflow-hidden">
-        {/* Background Effects */}
-        <div className="absolute inset-0 -z-10">
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-orange-500/20 rounded-full blur-3xl" />
-          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-red-500/20 rounded-full blur-3xl" />
-        </div>
-
-        <div className="container mx-auto text-center max-w-4xl">
+      {/* Hero */}
+      <section className="pt-28 md:pt-32 pb-16 md:pb-20 px-4">
+        <div className="max-w-4xl mx-auto text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
+            transition={{ duration: 0.6 }}
           >
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-500 text-sm font-medium mb-6">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-orange-500/10 text-orange-500 text-sm font-medium mb-6 border border-orange-500/20">
               <Flame className="w-4 h-4" />
-              Türkiye'nin İlk Acımasız AI Yaşam Koçu
+              Bahane yok, sadece sonuç
             </div>
-
-            <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold mb-6 leading-tight">
-              <span className="bg-gradient-to-r from-orange-400 via-red-500 to-orange-400 bg-clip-text text-transparent">
-                Bahane Yok,
-              </span>
-              <br />
-              <span className="text-foreground">Sadece Sonuç</span>
+            
+            <h1 className="text-4xl md:text-6xl font-bold mb-6 leading-tight">
+              Acımasız AI{' '}
+              <span className="bg-gradient-to-r from-orange-400 via-red-500 to-pink-500 bg-clip-text text-transparent">Yaşam Koçun</span>
             </h1>
-
+            
             <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-              Seni motive etmek için yalvarmayacak. Bahanelerini dinlemeyecek. 
-              Sadece gerçekleri söyleyecek ve seni hedefe ulaştıracak.
+              Alışkanlıklarını takip et, hedeflerine ulaş ve AI koçunla her gün daha iyi bir versiyon ol.
+              <strong className="text-orange-400"> Bahanelere yer yok.</strong> 🔥
             </p>
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Button size="lg" asChild className="w-full sm:w-auto bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-lg px-8 py-6">
-                <Link href="/signup">
+              <Link href="/signup">
+                <Button size="lg" className="w-full sm:w-auto h-12 px-8 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 shadow-lg shadow-orange-500/30">
                   Ücretsiz Başla
-                  <ArrowRight className="w-5 h-5 ml-2" />
-                </Link>
-              </Button>
-              <Button size="lg" variant="outline" asChild className="w-full sm:w-auto text-lg px-8 py-6">
-                <Link href="#how-it-works">
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
+              </Link>
+              <Link href="#how-it-works">
+                <Button size="lg" variant="outline" className="w-full sm:w-auto h-12 px-8 border-orange-500/30 hover:bg-orange-500/10">
                   Nasıl Çalışır?
-                </Link>
-              </Button>
+                  <ChevronDown className="w-4 h-4 ml-2" />
+                </Button>
+              </Link>
             </div>
 
             <p className="text-sm text-muted-foreground mt-4">
-              ✓ Kredi kartı gerektirmez &nbsp; ✓ 14 gün ücretsiz Pro
+              ✓ Kredi kartı gerekmez &nbsp; ✓ 30 saniyede kayıt &nbsp; ✓ Tamamen ücretsiz
             </p>
           </motion.div>
 
-          {/* Hero Image/Preview */}
+          {/* Stats */}
           <motion.div
-            initial={{ opacity: 0, y: 40 }}
+            initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-            className="mt-16 relative"
+            transition={{ delay: 0.3 }}
+            className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-12 max-w-3xl mx-auto"
           >
-            <div className="relative mx-auto max-w-3xl rounded-2xl overflow-hidden border border-border shadow-2xl shadow-orange-500/10">
-              <div className="bg-card p-4 border-b border-border flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-red-500" />
-                <div className="w-3 h-3 rounded-full bg-yellow-500" />
-                <div className="w-3 h-3 rounded-full bg-green-500" />
-                <span className="ml-4 text-sm text-muted-foreground">whippy.life/dashboard</span>
+            {STATS.map((stat, i) => (
+              <div key={i} className="p-4 rounded-xl bg-secondary/50 border border-border">
+                <p className="text-2xl md:text-3xl font-bold text-orange-500">{stat.value}</p>
+                <p className="text-sm text-muted-foreground">{stat.label}</p>
               </div>
-              <div className="bg-gradient-to-br from-card to-background p-8 min-h-[300px] flex items-center justify-center">
-                <div className="text-center">
-                  <div className="text-6xl mb-4">🔥</div>
-                  <p className="text-xl font-semibold text-foreground">Dashboard Preview</p>
-                  <p className="text-muted-foreground">Alışkanlıklar, hedefler, AI koç - hepsi bir arada</p>
-                </div>
-              </div>
-            </div>
+            ))}
           </motion.div>
         </div>
       </section>
 
-      {/* Features Section */}
-      <section id="features" className="py-20 px-4 bg-card/50">
-        <div className="container mx-auto max-w-6xl">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">3 Farklı Koçluk Modu</h2>
+      {/* Features */}
+      <section id="features" className="py-20 px-4 bg-gradient-to-b from-transparent to-secondary/30">
+        <div className="max-w-6xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-center mb-12"
+          >
+            <h2 className="text-3xl font-bold mb-4">Neden Whippy? 🚀</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Her ruh haline uygun bir koç. Sen seç, o konuşsun.
+              Hedeflerine ulaşmak için ihtiyacın olan tüm araçlar tek bir uygulamada
             </p>
-          </div>
+          </motion.div>
 
-          <div className="grid md:grid-cols-3 gap-8">
-            {/* Gentle Mode */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              className="relative p-8 rounded-2xl bg-gradient-to-br from-green-500/10 to-emerald-500/5 border border-green-500/20"
-            >
-              <div className="w-14 h-14 rounded-xl bg-green-500/20 flex items-center justify-center mb-6">
-                <Heart className="w-7 h-7 text-green-500" />
-              </div>
-              <h3 className="text-xl font-semibold mb-3">🌱 Nazik Mod</h3>
-              <p className="text-muted-foreground mb-4">
-                Destekleyici, anlayışlı ve motive edici. Zor günlerinde yanında, 
-                küçük başarılarını kutluyor.
-              </p>
-              <div className="p-4 rounded-xl bg-background/50 border border-border">
-                <p className="text-sm italic text-muted-foreground">
-                  "Bugün 2 alışkanlık tamamladın, bu harika bir başlangıç! 
-                  Her adım seni hedefe yaklaştırıyor. 💪"
-                </p>
-              </div>
-            </motion.div>
-
-            {/* Brutal Mode */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.1 }}
-              className="relative p-8 rounded-2xl bg-gradient-to-br from-red-500/10 to-orange-500/5 border border-red-500/20"
-            >
-              <div className="absolute -top-3 -right-3 px-3 py-1 rounded-full bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs font-bold">
-                POPÜLER
-              </div>
-              <div className="w-14 h-14 rounded-xl bg-red-500/20 flex items-center justify-center mb-6">
-                <Flame className="w-7 h-7 text-red-500" />
-              </div>
-              <h3 className="text-xl font-semibold mb-3">🔥 Acımasız Mod</h3>
-              <p className="text-muted-foreground mb-4">
-                Bahaneleri kabul etmez. Gerçekleri yüzüne vurur. 
-                Seni konfor alanından çıkarır.
-              </p>
-              <div className="p-4 rounded-xl bg-background/50 border border-border">
-                <p className="text-sm italic text-muted-foreground">
-                  "0 dakika egzersiz mi? Bu tembellik. Koltuktan kalk ve 
-                  hareket et. Bahane istemiyorum."
-                </p>
-              </div>
-            </motion.div>
-
-            {/* Predict Mode */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.2 }}
-              className="relative p-8 rounded-2xl bg-gradient-to-br from-purple-500/10 to-indigo-500/5 border border-purple-500/20"
-            >
-              <div className="w-14 h-14 rounded-xl bg-purple-500/20 flex items-center justify-center mb-6">
-                <Brain className="w-7 h-7 text-purple-500" />
-              </div>
-              <h3 className="text-xl font-semibold mb-3">🔮 6 Ay Tahmini</h3>
-              <p className="text-muted-foreground mb-4">
-                Mevcut tempona göre 6 ay sonra nerede olacağını tahmin eder. 
-                3 senaryo: İyimser, Gerçekçi, Kötümser.
-              </p>
-              <div className="p-4 rounded-xl bg-background/50 border border-border">
-                <p className="text-sm italic text-muted-foreground">
-                  "Bu tempoyla 6 ayda hedefe ulaşma şansın %65. 
-                  Egzersizi artırırsan %85'e çıkar."
-                </p>
-              </div>
-            </motion.div>
-          </div>
-        </div>
-      </section>
-
-      {/* How it Works */}
-      <section id="how-it-works" className="py-20 px-4">
-        <div className="container mx-auto max-w-6xl">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Nasıl Çalışır?</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              3 adımda hayatını değiştirmeye başla
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-8">
-            {[
-              {
-                step: '01',
-                icon: Target,
-                title: 'Hedeflerini Belirle',
-                description: 'Alışkanlıklarını, hedeflerini ve projelerini ekle. Whippy seni tanısın.'
-              },
-              {
-                step: '02',
-                icon: Zap,
-                title: 'Günlük Takip Et',
-                description: 'Her gün alışkanlıklarını işaretle, sağlık metriklerini gir, ruh halini kaydet.'
-              },
-              {
-                step: '03',
-                icon: Sparkles,
-                title: 'AI Koçunla Konuş',
-                description: 'Verilerine göre kişiselleştirilmiş tavsiyeler al. Motive ol veya gerçeklerle yüzleş.'
-              }
-            ].map((item, index) => (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {FEATURES.map((feature, i) => (
               <motion.div
-                key={item.step}
+                key={feature.title}
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ delay: index * 0.1 }}
-                className="relative text-center"
+                transition={{ delay: i * 0.1 }}
               >
-                <div className="text-7xl font-bold text-muted-foreground/10 absolute -top-4 left-1/2 -translate-x-1/2">
-                  {item.step}
-                </div>
-                <div className="relative z-10">
-                  <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-6">
-                    <item.icon className="w-8 h-8 text-primary" />
-                  </div>
-                  <h3 className="text-xl font-semibold mb-3">{item.title}</h3>
-                  <p className="text-muted-foreground">{item.description}</p>
-                </div>
+                <Card className="h-full hover:border-orange-500/30 transition-colors group">
+                  <CardContent className="pt-6">
+                    <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${feature.color} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
+                      <feature.icon className="w-6 h-6 text-white" />
+                    </div>
+                    <h3 className="font-semibold mb-2">{feature.title}</h3>
+                    <p className="text-sm text-muted-foreground">{feature.description}</p>
+                  </CardContent>
+                </Card>
               </motion.div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Pricing Section */}
-      <section id="pricing" className="py-20 px-4 bg-card/50">
-        <div className="container mx-auto max-w-5xl">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Basit Fiyatlandırma</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              İhtiyacına göre seç. İstediğin zaman yükselt veya iptal et.
+      {/* How It Works - Coach Modes */}
+      <section id="how-it-works" className="py-20 px-4">
+        <div className="max-w-5xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-center mb-12"
+          >
+            <h2 className="text-3xl font-bold mb-4">3 Farklı Koçluk Modu</h2>
+            <p className="text-muted-foreground">
+              İhtiyacına göre koçunu özelleştir - Nazik mi, Acımasız mı?
             </p>
-          </div>
+          </motion.div>
 
-          <div className="grid md:grid-cols-3 gap-8">
-            {/* Free Plan */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              className="p-8 rounded-2xl bg-background border border-border"
-            >
-              <h3 className="text-lg font-semibold mb-2">Free</h3>
-              <div className="flex items-baseline gap-1 mb-6">
-                <span className="text-4xl font-bold">₺0</span>
-                <span className="text-muted-foreground">/ay</span>
-              </div>
-              <ul className="space-y-3 mb-8">
-                {[
-                  '5 alışkanlık takibi',
-                  '2 hedef',
-                  'Günlük ruh hali kaydı',
-                  'Temel sağlık metrikleri',
-                  'Nazik mod AI koç',
-                ].map((feature) => (
-                  <li key={feature} className="flex items-center gap-3 text-sm">
-                    <Check className="w-4 h-4 text-green-500 shrink-0" />
-                    {feature}
-                  </li>
-                ))}
-              </ul>
-              <Button variant="outline" className="w-full" asChild>
-                <Link href="/signup">Ücretsiz Başla</Link>
-              </Button>
-            </motion.div>
-
-            {/* Pro Plan */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.1 }}
-              className="relative p-8 rounded-2xl bg-gradient-to-br from-orange-500/10 to-red-500/5 border-2 border-orange-500/50"
-            >
-              <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-gradient-to-r from-orange-500 to-red-500 text-white text-sm font-bold">
-                EN POPÜLER
-              </div>
-              <h3 className="text-lg font-semibold mb-2">Pro</h3>
-              <div className="flex items-baseline gap-1 mb-6">
-                <span className="text-4xl font-bold">₺99</span>
-                <span className="text-muted-foreground">/ay</span>
-              </div>
-              <ul className="space-y-3 mb-8">
-                {[
-                  'Sınırsız alışkanlık',
-                  'Sınırsız hedef',
-                  'Tüm koç modları (3 mod)',
-                  'Detaylı analitik & raporlar',
-                  'Haftalık özet e-posta',
-                  'Öncelikli destek',
-                ].map((feature) => (
-                  <li key={feature} className="flex items-center gap-3 text-sm">
-                    <Check className="w-4 h-4 text-orange-500 shrink-0" />
-                    {feature}
-                  </li>
-                ))}
-              </ul>
-              <Button className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600" asChild>
-                <Link href="/signup?plan=pro">Pro'ya Başla</Link>
-              </Button>
-            </motion.div>
-
-            {/* Elite Plan */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.2 }}
-              className="p-8 rounded-2xl bg-background border border-border"
-            >
-              <h3 className="text-lg font-semibold mb-2">Elite</h3>
-              <div className="flex items-baseline gap-1 mb-6">
-                <span className="text-4xl font-bold">₺199</span>
-                <span className="text-muted-foreground">/ay</span>
-              </div>
-              <ul className="space-y-3 mb-8">
-                {[
-                  'Pro\'daki her şey',
-                  'Kişisel koç asistanı',
-                  'Özel hedef planlaması',
-                  'Video içerikler',
-                  '1-1 destek önceliği',
-                  'API erişimi',
-                ].map((feature) => (
-                  <li key={feature} className="flex items-center gap-3 text-sm">
-                    <Check className="w-4 h-4 text-purple-500 shrink-0" />
-                    {feature}
-                  </li>
-                ))}
-              </ul>
-              <Button variant="outline" className="w-full" asChild>
-                <Link href="/signup?plan=elite">Elite'e Başla</Link>
-              </Button>
-            </motion.div>
+          <div className="grid md:grid-cols-3 gap-6">
+            {COACH_MODES.map((mode, i) => (
+              <motion.div
+                key={mode.name}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.1 }}
+                className={`p-6 rounded-2xl border ${mode.color} hover:scale-105 transition-transform cursor-pointer`}
+              >
+                <div className="text-4xl mb-4">{mode.emoji}</div>
+                <h3 className="font-semibold text-lg mb-2">{mode.name}</h3>
+                <p className="text-sm opacity-80 mb-4">{mode.description}</p>
+                <p className="text-xs italic opacity-60">{mode.example}</p>
+              </motion.div>
+            ))}
           </div>
         </div>
       </section>
 
       {/* Testimonials */}
-      <section className="py-20 px-4">
-        <div className="container mx-auto max-w-6xl">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Kullanıcılar Ne Diyor?</h2>
-          </div>
+      <section className="py-20 px-4 bg-gradient-to-b from-transparent to-orange-500/5">
+        <div className="max-w-6xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-center mb-12"
+          >
+            <h2 className="text-3xl font-bold mb-4">Kullanıcılar Ne Diyor? 🗣️</h2>
+          </motion.div>
 
-          <div className="grid md:grid-cols-3 gap-8">
-            {[
-              {
-                name: 'Ahmet Y.',
-                role: 'Yazılım Geliştirici',
-                avatar: '👨‍💻',
-                quote: 'Acımasız mod beni gerçekten motive etti. Artık bahaneler üretmiyorum, sadece yapıyorum.',
-                rating: 5
-              },
-              {
-                name: 'Elif K.',
-                role: 'Fitness Eğitmeni',
-                avatar: '💪',
-                quote: '6 ay tahmini özelliği müthiş. Müşterilerime de öneriyorum. Gerçekçi hedefler koymayı öğretti.',
-                rating: 5
-              },
-              {
-                name: 'Can M.',
-                role: 'Girişimci',
-                avatar: '🚀',
-                quote: 'Her sabah Whippy ile başlıyorum. Alışkanlık takibi + AI koç kombinasyonu harika.',
-                rating: 5
-              }
-            ].map((testimonial, index) => (
+          <div className="grid md:grid-cols-3 gap-6">
+            {TESTIMONIALS.map((t, i) => (
               <motion.div
-                key={testimonial.name}
+                key={i}
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ delay: index * 0.1 }}
-                className="p-6 rounded-2xl bg-card border border-border"
+                transition={{ delay: i * 0.1 }}
               >
-                <div className="flex items-center gap-1 mb-4">
-                  {Array.from({ length: testimonial.rating }).map((_, i) => (
-                    <Star key={i} className="w-4 h-4 fill-yellow-500 text-yellow-500" />
-                  ))}
-                </div>
-                <p className="text-muted-foreground mb-6">"{testimonial.quote}"</p>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-xl">
-                    {testimonial.avatar}
-                  </div>
-                  <div>
-                    <p className="font-medium">{testimonial.name}</p>
-                    <p className="text-sm text-muted-foreground">{testimonial.role}</p>
-                  </div>
-                </div>
+                <Card className="h-full hover:border-orange-500/30 transition-colors">
+                  <CardContent className="pt-6">
+                    <div className="flex gap-1 mb-4">
+                      {[...Array(5)].map((_, j) => (
+                        <Star key={j} className="w-4 h-4 fill-orange-500 text-orange-500" />
+                      ))}
+                    </div>
+                    <p className="text-sm mb-4 italic">"{t.quote}"</p>
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center text-xl">
+                        {t.avatar}
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm">{t.author}</p>
+                        <p className="text-xs text-muted-foreground">{t.role}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               </motion.div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Final CTA */}
-      <section className="py-20 px-4">
-        <div className="container mx-auto max-w-3xl text-center">
+      {/* Pricing */}
+      <section id="pricing" className="py-20 px-4">
+        <div className="max-w-4xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="p-12 rounded-3xl bg-gradient-to-br from-orange-500/20 to-red-500/10 border border-orange-500/30"
+            className="text-center mb-12"
           >
-            <div className="text-5xl mb-6">🔥</div>
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Bahanelere Son Ver
-            </h2>
-            <p className="text-lg text-muted-foreground mb-8">
-              Bugün başla, 6 ay sonra farklı bir insan ol.
+            <h2 className="text-3xl font-bold mb-4">Basit Fiyatlandırma 💰</h2>
+            <p className="text-muted-foreground">
+              Şimdilik tamamen ücretsiz! Tüm özellikler açık.
             </p>
-            <Button size="lg" asChild className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-lg px-8 py-6">
-              <Link href="/signup">
-                Ücretsiz Başla
-                <ArrowRight className="w-5 h-5 ml-2" />
-              </Link>
-            </Button>
           </motion.div>
+
+          <div className="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto">
+            {PRICING.map((plan, i) => (
+              <motion.div
+                key={plan.name}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.1 }}
+              >
+                <Card className={`h-full ${plan.popular ? 'border-orange-500 shadow-lg shadow-orange-500/20' : 'opacity-60'}`}>
+                  {plan.popular && (
+                    <div className="bg-gradient-to-r from-orange-500 to-red-600 text-white text-xs font-medium text-center py-1">
+                      🔥 Şu An Aktif
+                    </div>
+                  )}
+                  <CardContent className="pt-6">
+                    <h3 className="font-semibold text-lg">{plan.name}</h3>
+                    <p className="text-sm text-muted-foreground mb-4">{plan.description}</p>
+                    <div className="mb-6">
+                      <span className="text-4xl font-bold">{plan.price}</span>
+                      <span className="text-muted-foreground">{plan.period}</span>
+                    </div>
+                    <ul className="space-y-3 mb-6">
+                      {plan.features.map((feature, j) => (
+                        <li key={j} className="flex items-center gap-2 text-sm">
+                          <Check className="w-4 h-4 text-orange-500 shrink-0" />
+                          {feature}
+                        </li>
+                      ))}
+                    </ul>
+                    <Link href={plan.href}>
+                      <Button 
+                        className={`w-full ${plan.popular ? 'bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700' : ''}`}
+                        variant={plan.popular ? 'default' : 'outline'}
+                        disabled={plan.disabled}
+                      >
+                        {plan.cta}
+                      </Button>
+                    </Link>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
         </div>
       </section>
 
+      {/* CTA */}
+      <section className="py-20 px-4">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="max-w-3xl mx-auto text-center"
+        >
+          <div className="p-8 md:p-12 rounded-3xl bg-gradient-to-br from-orange-500/20 to-red-600/20 border border-orange-500/30">
+            <div className="text-5xl mb-4">🔥</div>
+            <h2 className="text-3xl font-bold mb-4">
+              Bahanelere son ver, bugün başla
+            </h2>
+            <p className="text-muted-foreground mb-6">
+              Binlerce kişi zaten Whippy ile hedeflerine ulaşıyor. Sen de aramıza katıl!
+            </p>
+            <Link href="/signup">
+              <Button size="lg" className="h-12 px-8 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 shadow-lg shadow-orange-500/30">
+                Ücretsiz Başla
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
+            </Link>
+            <p className="text-sm text-muted-foreground mt-4">
+              30 saniyede kayıt ol, hemen kullanmaya başla
+            </p>
+          </div>
+        </motion.div>
+      </section>
+
       {/* Footer */}
-      <footer className="py-12 px-4 border-t border-border">
-        <div className="container mx-auto max-w-6xl">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="flex items-center gap-2">
-              <span className="text-xl font-bold bg-gradient-to-r from-orange-400 to-red-500 bg-clip-text text-transparent">
-                Whippy
-              </span>
-              <span className="text-sm text-muted-foreground">© 2026</span>
+      <footer className="border-t border-border py-12 px-4">
+        <div className="max-w-6xl mx-auto">
+          <div className="grid md:grid-cols-4 gap-8 mb-8">
+            <div>
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center shadow-lg shadow-orange-500/20">
+                  <span className="text-sm">🔥</span>
+                </div>
+                <span className="font-bold bg-gradient-to-r from-orange-400 to-red-500 bg-clip-text text-transparent">Whippy</span>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Acımasız AI yaşam koçunuz. Alışkanlık takibi, hedef yönetimi ve daha fazlası.
+              </p>
             </div>
-            <div className="flex items-center gap-6 text-sm text-muted-foreground">
-              <a href="#" className="hover:text-foreground transition-colors">Gizlilik</a>
-              <a href="#" className="hover:text-foreground transition-colors">Kullanım Şartları</a>
-              <a href="#" className="hover:text-foreground transition-colors">İletişim</a>
+            <div>
+              <h4 className="font-semibold mb-4">Ürün</h4>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li><Link href="#features" className="hover:text-foreground">Özellikler</Link></li>
+                <li><Link href="#pricing" className="hover:text-foreground">Fiyatlandırma</Link></li>
+                <li><Link href="/login" className="hover:text-foreground">Giriş Yap</Link></li>
+                <li><Link href="/signup" className="hover:text-foreground">Kayıt Ol</Link></li>
+              </ul>
             </div>
+            <div>
+              <h4 className="font-semibold mb-4">Destek</h4>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li><a href="mailto:destek@whippy.life" className="hover:text-foreground">İletişim</a></li>
+                <li><Link href="/privacy" className="hover:text-foreground">Gizlilik Politikası</Link></li>
+                <li><Link href="/terms" className="hover:text-foreground">Kullanım Koşulları</Link></li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-4">Sosyal</h4>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li><a href="https://twitter.com/whippylife" target="_blank" rel="noopener" className="hover:text-foreground">Twitter</a></li>
+                <li><a href="https://instagram.com/whippylife" target="_blank" rel="noopener" className="hover:text-foreground">Instagram</a></li>
+              </ul>
+            </div>
+          </div>
+          <div className="pt-8 border-t border-border flex flex-col md:flex-row items-center justify-between gap-4">
+            <p className="text-sm text-muted-foreground">
+              © 2025 Whippy. Tüm hakları saklıdır.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Made with 🔥 in Istanbul
+            </p>
           </div>
         </div>
       </footer>

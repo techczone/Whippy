@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, FolderKanban, Clock, CheckCircle, Pause, Play, Trash2, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -23,18 +23,26 @@ const PRIORITIES = [
 
 export default function ProjectsPage() {
   const { t, language } = useTranslation()
-  const { projects, loading, addProject, updateProject, deleteProject } = useProjects()
+  const { projects = [], loading, addProject, updateProject, deleteProject } = useProjects()
   const [filter, setFilter] = useState<'all' | 'active' | 'paused' | 'completed'>('all')
   const [showAddModal, setShowAddModal] = useState(false)
+  const [mounted, setMounted] = useState(false)
 
-  const filteredProjects = projects.filter(p => {
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // Safe array operations
+  const safeProjects = projects || []
+
+  const filteredProjects = safeProjects.filter(p => {
     if (filter === 'all') return true
     return p.status === filter
   })
 
-  const activeCount = projects.filter(p => p.status === 'active').length
-  const completedCount = projects.filter(p => p.status === 'completed').length
-  const pausedCount = projects.filter(p => p.status === 'paused').length
+  const activeCount = safeProjects.filter(p => p.status === 'active').length
+  const completedCount = safeProjects.filter(p => p.status === 'completed').length
+  const pausedCount = safeProjects.filter(p => p.status === 'paused').length
 
   const handleUpdateProgress = async (id: string, progress: number) => {
     const newProgress = Math.min(100, Math.max(0, progress))
@@ -51,10 +59,25 @@ export default function ProjectsPage() {
   }
 
   const handleDelete = async (id: string) => {
-    if (confirm(t.messages.delete_confirm)) {
+    if (confirm(t.messages?.delete_confirm || 'Silmek istediğine emin misin?')) {
       await deleteProject(id)
       toast.success(language === 'tr' ? 'Proje silindi' : 'Project deleted')
     }
+  }
+
+  // Prevent hydration mismatch
+  if (!mounted) {
+    return (
+      <div className="space-y-6 animate-pulse">
+        <div className="h-10 bg-muted rounded w-48" />
+        <div className="grid grid-cols-3 gap-4">
+          {[1,2,3].map(i => <div key={i} className="h-20 bg-muted rounded-xl" />)}
+        </div>
+        <div className="space-y-4">
+          {[1,2,3].map(i => <div key={i} className="h-32 bg-muted rounded-xl" />)}
+        </div>
+      </div>
+    )
   }
 
   if (loading) {
@@ -76,12 +99,12 @@ export default function ProjectsPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold">{t.projects.title}</h1>
-          <p className="text-muted-foreground">{t.projects.subtitle}</p>
+          <h1 className="text-2xl md:text-3xl font-bold">{t.projects?.title || 'Projeler'}</h1>
+          <p className="text-muted-foreground">{t.projects?.subtitle || 'Projelerini yönet'}</p>
         </div>
         <Button onClick={() => setShowAddModal(true)}>
           <Plus className="w-4 h-4 mr-2" />
-          {t.projects.add_new}
+          {t.projects?.add_new || 'Yeni Proje'}
         </Button>
       </div>
 
@@ -90,19 +113,19 @@ export default function ProjectsPage() {
         <Card>
           <CardContent className="pt-4 text-center">
             <p className="text-2xl font-bold text-primary">{activeCount}</p>
-            <p className="text-xs text-muted-foreground">{t.projects.active}</p>
+            <p className="text-xs text-muted-foreground">{t.projects?.active || 'Aktif'}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4 text-center">
             <p className="text-2xl font-bold text-green-500">{completedCount}</p>
-            <p className="text-xs text-muted-foreground">{t.projects.completed}</p>
+            <p className="text-xs text-muted-foreground">{t.projects?.completed || 'Tamamlandı'}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4 text-center">
             <p className="text-2xl font-bold text-yellow-500">{pausedCount}</p>
-            <p className="text-xs text-muted-foreground">{t.projects.paused}</p>
+            <p className="text-xs text-muted-foreground">{t.projects?.paused || 'Beklemede'}</p>
           </CardContent>
         </Card>
       </div>
@@ -117,10 +140,10 @@ export default function ProjectsPage() {
             onClick={() => setFilter(f)}
             className="shrink-0"
           >
-            {f === 'all' ? t.all : 
-             f === 'active' ? t.projects.active : 
-             f === 'paused' ? t.projects.paused : 
-             t.projects.completed}
+            {f === 'all' ? (t.all || 'Tümü') : 
+             f === 'active' ? (t.projects?.active || 'Aktif') : 
+             f === 'paused' ? (t.projects?.paused || 'Beklemede') : 
+             (t.projects?.completed || 'Tamamlandı')}
           </Button>
         ))}
       </div>
@@ -131,11 +154,11 @@ export default function ProjectsPage() {
           <Card>
             <CardContent className="py-12 text-center">
               <FolderKanban className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-              <h3 className="font-medium mb-2">{t.projects.no_projects}</h3>
-              <p className="text-sm text-muted-foreground mb-4">{t.projects.create_first}</p>
+              <h3 className="font-medium mb-2">{t.projects?.no_projects || 'Henüz proje yok'}</h3>
+              <p className="text-sm text-muted-foreground mb-4">{t.projects?.create_first || 'İlk projenizi oluşturun'}</p>
               <Button onClick={() => setShowAddModal(true)}>
                 <Plus className="w-4 h-4 mr-2" />
-                {t.projects.add_new}
+                {t.projects?.add_new || 'Yeni Proje'}
               </Button>
             </CardContent>
           </Card>
@@ -154,7 +177,7 @@ export default function ProjectsPage() {
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-3">
                       <div 
-                        className="w-3 h-3 rounded-full"
+                        className="w-3 h-3 rounded-full shrink-0"
                         style={{ backgroundColor: project.color }}
                       />
                       <div>
@@ -286,16 +309,19 @@ function AddProjectModal({
   const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium')
   const [dueDate, setDueDate] = useState('')
   const [color, setColor] = useState(COLOR_OPTIONS[0])
+  const [submitting, setSubmitting] = useState(false)
 
-  const handleSubmit = () => {
-    if (!name.trim()) return
-    onAdd({
+  const handleSubmit = async () => {
+    if (!name.trim() || submitting) return
+    setSubmitting(true)
+    await onAdd({
       name,
       description,
       priority,
       due_date: dueDate || undefined,
       color,
     })
+    setSubmitting(false)
   }
 
   return (
@@ -315,7 +341,7 @@ function AddProjectModal({
       >
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b shrink-0">
-          <h2 className="text-xl font-bold">{t.projects.add_new}</h2>
+          <h2 className="text-xl font-bold">{t.projects?.add_new || 'Yeni Proje'}</h2>
           <Button variant="ghost" size="icon" onClick={onClose}>
             <X className="w-5 h-5" />
           </Button>
@@ -324,7 +350,7 @@ function AddProjectModal({
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           <div>
-            <label className="text-sm font-medium mb-2 block">{t.projects.project_name} *</label>
+            <label className="text-sm font-medium mb-2 block">{t.projects?.project_name || 'Proje Adı'} *</label>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -334,7 +360,7 @@ function AddProjectModal({
           </div>
 
           <div>
-            <label className="text-sm font-medium mb-2 block">{t.projects.description}</label>
+            <label className="text-sm font-medium mb-2 block">{t.projects?.description || 'Açıklama'}</label>
             <Input
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -343,7 +369,7 @@ function AddProjectModal({
           </div>
 
           <div>
-            <label className="text-sm font-medium mb-2 block">{t.projects.priority}</label>
+            <label className="text-sm font-medium mb-2 block">{t.projects?.priority || 'Öncelik'}</label>
             <div className="flex gap-2">
               {PRIORITIES.map((p) => (
                 <button
@@ -363,7 +389,7 @@ function AddProjectModal({
           </div>
 
           <div>
-            <label className="text-sm font-medium mb-2 block">{t.projects.due_date}</label>
+            <label className="text-sm font-medium mb-2 block">{t.projects?.due_date || 'Bitiş Tarihi'}</label>
             <Input
               type="date"
               value={dueDate}
@@ -372,7 +398,7 @@ function AddProjectModal({
           </div>
 
           <div>
-            <label className="text-sm font-medium mb-2 block">{t.projects.color}</label>
+            <label className="text-sm font-medium mb-2 block">{t.projects?.color || 'Renk'}</label>
             <div className="flex flex-wrap gap-2">
               {COLOR_OPTIONS.map((c) => (
                 <button
@@ -392,10 +418,14 @@ function AddProjectModal({
         {/* Footer */}
         <div className="flex gap-3 p-4 border-t shrink-0">
           <Button variant="outline" className="flex-1" onClick={onClose}>
-            {t.cancel}
+            {t.cancel || 'İptal'}
           </Button>
-          <Button className="flex-1" onClick={handleSubmit} disabled={!name.trim()}>
-            {t.add}
+          <Button 
+            className="flex-1" 
+            onClick={handleSubmit} 
+            disabled={!name.trim() || submitting}
+          >
+            {submitting ? (language === 'tr' ? 'Ekleniyor...' : 'Adding...') : (t.add || 'Ekle')}
           </Button>
         </div>
       </motion.div>

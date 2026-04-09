@@ -2,226 +2,155 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useAuth } from './use-auth'
 import type { Habit, HabitLog } from '@/types'
 import toast from 'react-hot-toast'
 
 // ============================================
-// HABITS HOOK
+// MAIN HABITS HOOK (Auto userId from useAuth)
 // ============================================
 
-export function useHabits(userId: string | undefined) {
+export function useHabits() {
+  const { user } = useAuth()
+  const userId = user?.id
+
   const [habits, setHabits] = useState<Habit[]>([])
+  const [todayLogs, setTodayLogs] = useState<HabitLog[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
-  
-  const supabase = useMemo(() => createClient(), [])
 
-  // Fetch habits
-  const fetchHabits = useCallback(async () => {
+  const supabase = useMemo(() => createClient(), [])
+  const today = new Date().toISOString().split('T')[0]
+
+  // Fetch habits and today's logs
+  const fetchData = useCallback(async () => {
     if (!userId) {
       setHabits([])
+      setTodayLogs([])
       setLoading(false)
       return
     }
 
     try {
       setLoading(true)
-      const { data, error } = await supabase
+      
+      // Fetch habits
+      const { data: habitsData, error: habitsError } = await supabase
         .from('habits')
         .select('*')
         .eq('user_id', userId)
         .eq('archived', false)
-        .order('sort_order', { ascending: true })
+        .order('created_at', { ascending: false })
 
-      if (error) throw error
-      setHabits(data || [])
+      if (habitsError) throw habitsError
+
+      // Fetch today's logs
+      const { data: logsData, error: logsError } = await supabase
+        .from('habit_logs')
+        .select('*')
+        .eq('user_id', userId)
+        .gte('completed_at', `${today}T00:00:00`)
+        .lte('completed_at', `${today}T23:59:59`)
+
+      if (logsError) throw logsError
+
+      setHabits(habitsData || [])
+      setTodayLogs(logsData || [])
     } catch (err) {
       setError(err as Error)
       console.error('Error fetching habits:', err)
     } finally {
       setLoading(false)
     }
-  }, [userId, supabase])
+  }, [userId, supabase, today])
 
   useEffect(() => {
-    fetchHabits()
-  }, [fetchHabits])
+    fetchData()
+  }, [fetchData])
 
   // Add habit
-  const addHabit = async (habit: Omit<Habit, 'id' | 'user_id' | 'created_at' | 'streak' | 'best_streak'>) => {
-    if (!userId) return null
+  const addHabit = useCallback(async (habit: {
+    name: string
+    icon: string
+    color: string
+    frequency?: string
+    target_days?: number[]
+  }) => {
+    if (!userId) {
+      toast.error('Giriş yapmalısınız')
+      return null
+    }
+
+    // Optimistic update
+    const tempId = `temp-${Date.now()}`
+    const tempHabit: Habit = {
+      id: tempId,
+      user_id: userId,
+      name: habit.name,
+      icon: habit.icon,
+      color: habit.color,
+      frequency: habit.frequency || 'daily',
+      target_days: habit.target_days || [0, 1, 2, 3, 4, 5, 6],
+      streak: 0,
+      best_streak: 0,
+      archived: false,
+      created_at: new Date().toISOString(),
+    }
+    setHabits(prev => [tempHabit, ...prev])
 
     try {
       const { data, error } = await supabase
         .from('habits')
         .insert({
-          ...habit,
           user_id: userId,
+          name: habit.name,
+          icon: habit.icon,
+          color: habit.color,
+          frequency: habit.frequency || 'daily',
+          target_days: habit.target_days || [0, 1, 2, 3, 4, 5, 6],
           streak: 0,
           best_streak: 0,
+          archived: false,
         })
         .select()
         .single()
 
       if (error) throw error
       
-      setHabits(prev => [...prev, data])
-      toast.success('Alışkanlık eklendi!')
+      // Replace temp with real
+      setHabits(prev => prev.map(h => h.id === tempId ? data : h))
       return data
     } catch (err) {
+      // Rollback
+      setHabits(prev => prev.filter(h => h.id !== tempId))
       console.error('Error adding habit:', err)
       toast.error('Alışkanlık eklenemedi')
       return null
     }
-  }
+  }, [userId, supabase])
 
-  // Update habit
-  const updateHabit = async (id: string, updates: Partial<Habit>) => {
-    try {
-      const { data, error } = await supabase
-        .from('habits')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single()
-
-      if (error) throw error
-      
-      setHabits(prev => prev.map(h => h.id === id ? data : h))
-      return data
-    } catch (err) {
-      console.error('Error updating habit:', err)
-      toast.error('Güncelleme başarısız')
-      return null
-    }
-  }
-
-  // Delete habit (archive)
-  const deleteHabit = async (id: string) => {
-    try {
-      const { error } = await supabase
-        .from('habits')
-        .update({ archived: true })
-        .eq('id', id)
-
-      if (error) throw error
-      
-      setHabits(prev => prev.filter(h => h.id !== id))
-      toast.success('Alışkanlık silindi')
-    } catch (err) {
-      console.error('Error deleting habit:', err)
-      toast.error('Silme başarısız')
-    }
-  }
-
-  return {
-    habits,
-    loading,
-    error,
-    addHabit,
-    updateHabit,
-    deleteHabit,
-    refetch: fetchHabits,
-  }
-}
-
-// ============================================
-// HABIT LOGS HOOK
-// ============================================
-
-export function useHabitLogs(userId: string | undefined, date?: string) {
-  const [logs, setLogs] = useState<HabitLog[]>([])
-  const [loading, setLoading] = useState(true)
-  
-  const supabase = useMemo(() => createClient(), [])
-  const today = date || new Date().toISOString().split('T')[0]
-
-  // Fetch logs for today
-  const fetchLogs = useCallback(async () => {
-    if (!userId) {
-      setLogs([])
-      setLoading(false)
-      return
-    }
-
-    try {
-      setLoading(true)
-      const { data, error } = await supabase
-        .from('habit_logs')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('date', today)
-
-      if (error) throw error
-      setLogs(data || [])
-    } catch (err) {
-      console.error('Error fetching habit logs:', err)
-    } finally {
-      setLoading(false)
-    }
-  }, [userId, today, supabase])
-
-  useEffect(() => {
-    fetchLogs()
-  }, [fetchLogs])
-
-  // Toggle habit completion
-  const toggleHabit = async (habitId: string) => {
+  // Toggle habit (complete/uncomplete for today)
+  const toggleHabit = useCallback(async (habitId: string) => {
     if (!userId) return
 
-    const existingLog = logs.find(l => l.habit_id === habitId)
-
-    // Optimistic update - UI'ı hemen güncelle
-    if (existingLog) {
-      setLogs(prev => prev.map(l => 
-        l.id === existingLog.id 
-          ? { ...l, completed: !l.completed, completed_at: !l.completed ? new Date().toISOString() : null }
-          : l
-      ))
-    } else {
-      // Yeni log için geçici ID ile ekle
-      const tempLog: HabitLog = {
-        id: `temp-${Date.now()}`,
-        habit_id: habitId,
-        user_id: userId,
-        date: today,
-        completed: true,
-        completed_at: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-      }
-      setLogs(prev => [...prev, tempLog])
-    }
+    const existingLog = todayLogs.find(l => l.habit_id === habitId)
 
     try {
       if (existingLog) {
-        // Update existing log
-        const { data, error } = await supabase
+        // Remove log (uncomplete)
+        await supabase
           .from('habit_logs')
-          .update({ 
-            completed: !existingLog.completed,
-            completed_at: !existingLog.completed ? new Date().toISOString() : null
-          })
+          .delete()
           .eq('id', existingLog.id)
-          .select()
-          .single()
 
-        if (error) throw error
-        
-        // Gerçek data ile güncelle
-        setLogs(prev => prev.map(l => l.id === existingLog.id ? data : l))
-        
-        if (data.completed) {
-          toast.success('Tebrikler! 🎉')
-        }
+        setTodayLogs(prev => prev.filter(l => l.id !== existingLog.id))
       } else {
-        // Create new log
+        // Add log (complete)
         const { data, error } = await supabase
           .from('habit_logs')
           .insert({
             habit_id: habitId,
             user_id: userId,
-            date: today,
-            completed: true,
             completed_at: new Date().toISOString(),
           })
           .select()
@@ -229,63 +158,72 @@ export function useHabitLogs(userId: string | undefined, date?: string) {
 
         if (error) throw error
         
-        // Temp log'u gerçek data ile değiştir
-        setLogs(prev => prev.map(l => 
-          l.id.startsWith('temp-') && l.habit_id === habitId ? data : l
-        ))
+        setTodayLogs(prev => [...prev, data])
         toast.success('Tebrikler! 🎉')
       }
     } catch (err) {
       console.error('Error toggling habit:', err)
       toast.error('Bir hata oluştu')
-      // Hata durumunda geri al
-      fetchLogs()
     }
-  }
+  }, [userId, supabase, todayLogs])
 
-  // Check if habit is completed today
-  const isCompleted = (habitId: string) => {
-    const log = logs.find(l => l.habit_id === habitId)
-    return log?.completed || false
-  }
+  // Delete habit (archive)
+  const deleteHabit = useCallback(async (id: string) => {
+    if (!userId) return
+
+    const prevHabits = [...habits]
+    setHabits(prev => prev.filter(h => h.id !== id))
+
+    try {
+      const { error } = await supabase
+        .from('habits')
+        .update({ archived: true })
+        .eq('id', id)
+        .eq('user_id', userId)
+
+      if (error) throw error
+    } catch (err) {
+      setHabits(prevHabits)
+      console.error('Error deleting habit:', err)
+      toast.error('Silme başarısız')
+    }
+  }, [userId, supabase, habits])
+
+  // Update habit
+  const updateHabit = useCallback(async (id: string, updates: Partial<Habit>) => {
+    if (!userId) return null
+
+    const prevHabits = [...habits]
+    setHabits(prev => prev.map(h => h.id === id ? { ...h, ...updates } : h))
+
+    try {
+      const { data, error } = await supabase
+        .from('habits')
+        .update(updates)
+        .eq('id', id)
+        .eq('user_id', userId)
+        .select()
+        .single()
+
+      if (error) throw error
+      return data
+    } catch (err) {
+      setHabits(prevHabits)
+      console.error('Error updating habit:', err)
+      toast.error('Güncelleme başarısız')
+      return null
+    }
+  }, [userId, supabase, habits])
 
   return {
-    logs,
+    habits,
+    todayLogs,
     loading,
-    toggleHabit,
-    isCompleted,
-    refetch: fetchLogs,
-  }
-}
-
-// ============================================
-// COMBINED HABITS WITH TODAY STATUS
-// ============================================
-
-export function useHabitsWithStatus(userId: string | undefined) {
-  const { habits, loading: habitsLoading, addHabit, updateHabit, deleteHabit } = useHabits(userId)
-  const { logs, loading: logsLoading, toggleHabit, isCompleted } = useHabitLogs(userId)
-
-  const habitsWithStatus = useMemo(() => {
-    return habits.map(habit => ({
-      ...habit,
-      completedToday: isCompleted(habit.id),
-    }))
-  }, [habits, logs]) // logs değişince yeniden hesapla
-
-  const completedCount = habitsWithStatus.filter(h => h.completedToday).length
-  const totalCount = habitsWithStatus.length
-  const completionRate = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
-
-  return {
-    habits: habitsWithStatus,
-    loading: habitsLoading || logsLoading,
-    completedCount,
-    totalCount,
-    completionRate,
-    toggleHabit,
+    error,
     addHabit,
-    updateHabit,
+    toggleHabit,
     deleteHabit,
+    updateHabit,
+    refetch: fetchData,
   }
 }

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Target, TrendingUp, CheckCircle, Clock } from 'lucide-react'
+import { Plus, Target, TrendingUp, CheckCircle, Clock, X } from 'lucide-react'
 import { cn, GOAL_CATEGORY_ICONS } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -41,6 +41,9 @@ export default function GoalsPage() {
 
   const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all')
   const [showAddModal, setShowAddModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editingGoal, setEditingGoal] = useState<Goal | null>(null)
+  
   const [newGoal, setNewGoal] = useState({
     title: '',
     description: '',
@@ -65,13 +68,40 @@ export default function GoalsPage() {
   }
 
   const handleDelete = async (id: string) => {
-    await deleteGoal(id)
+    if (confirm('Bu hedefi silmek istediğine emin misin?')) {
+      await deleteGoal(id)
+    }
+  }
+
+  const handleEdit = (id: string) => {
+    const goal = goals.find(g => g.id === id)
+    if (goal) {
+      setEditingGoal(goal)
+      setShowEditModal(true)
+    }
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editingGoal) return
+    
+    await updateGoal(editingGoal.id, {
+      title: editingGoal.title,
+      description: editingGoal.description,
+      target_value: editingGoal.target_value,
+      current_value: editingGoal.current_value,
+      unit: editingGoal.unit,
+      deadline: editingGoal.deadline,
+      category: editingGoal.category,
+    })
+    
+    setShowEditModal(false)
+    setEditingGoal(null)
   }
 
   const handleAddGoal = async () => {
     if (!newGoal.title.trim()) return
     
-    await addGoal({
+    const result = await addGoal({
       title: newGoal.title,
       description: newGoal.description || null,
       target_value: newGoal.target_value,
@@ -80,8 +110,10 @@ export default function GoalsPage() {
       category: newGoal.category,
     })
     
-    setNewGoal({ title: '', description: '', target_value: 0, unit: '', deadline: '', category: 'personal' })
-    setShowAddModal(false)
+    if (result) {
+      setNewGoal({ title: '', description: '', target_value: 0, unit: '', deadline: '', category: 'personal' })
+      setShowAddModal(false)
+    }
   }
 
   if (loading) {
@@ -186,6 +218,7 @@ export default function GoalsPage() {
             <GoalCard
               key={goal.id}
               goal={goal}
+              onEdit={handleEdit}
               onUpdateProgress={handleUpdateProgress}
               onStatusChange={handleStatusChange}
               onDelete={handleDelete}
@@ -205,6 +238,14 @@ export default function GoalsPage() {
         </div>
       )}
 
+      {/* Mobile FAB */}
+      <button
+        onClick={() => setShowAddModal(true)}
+        className="fixed bottom-24 right-4 md:hidden w-14 h-14 rounded-full bg-primary text-white shadow-lg flex items-center justify-center z-40"
+      >
+        <Plus className="w-6 h-6" />
+      </button>
+
       {/* Add goal modal */}
       <AnimatePresence>
         {showAddModal && (
@@ -222,7 +263,12 @@ export default function GoalsPage() {
               className="bg-card border border-border rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
             >
-              <h2 className="text-xl font-bold mb-4">Yeni Hedef</h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold">Yeni Hedef</h2>
+                <Button variant="ghost" size="icon" onClick={() => setShowAddModal(false)}>
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
               
               <div className="space-y-4">
                 <div>
@@ -278,6 +324,7 @@ export default function GoalsPage() {
                     {CATEGORIES.map((cat) => (
                       <button
                         key={cat.id}
+                        type="button"
                         onClick={() => setNewGoal(prev => ({ ...prev, category: cat.id }))}
                         className={cn(
                           'flex flex-col items-center gap-1 p-2 rounded-lg transition-all',
@@ -299,6 +346,123 @@ export default function GoalsPage() {
                   </Button>
                   <Button onClick={handleAddGoal} className="flex-1">
                     Ekle
+                  </Button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Edit goal modal */}
+      <AnimatePresence>
+        {showEditModal && editingGoal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+            onClick={() => { setShowEditModal(false); setEditingGoal(null); }}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-card border border-border rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold">Hedefi Düzenle</h2>
+                <Button variant="ghost" size="icon" onClick={() => { setShowEditModal(false); setEditingGoal(null); }}>
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Hedef Adı</label>
+                  <Input
+                    value={editingGoal.title || ''}
+                    onChange={(e) => setEditingGoal(prev => prev ? { ...prev, title: e.target.value } : null)}
+                    placeholder="örn: 10 kg ver"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Açıklama</label>
+                  <Input
+                    value={editingGoal.description || ''}
+                    onChange={(e) => setEditingGoal(prev => prev ? { ...prev, description: e.target.value } : null)}
+                    placeholder="Kısa açıklama..."
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Mevcut Değer</label>
+                    <Input
+                      type="number"
+                      value={editingGoal.current_value || 0}
+                      onChange={(e) => setEditingGoal(prev => prev ? { ...prev, current_value: parseInt(e.target.value) || 0 } : null)}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Hedef Değer</label>
+                    <Input
+                      type="number"
+                      value={editingGoal.target_value || 0}
+                      onChange={(e) => setEditingGoal(prev => prev ? { ...prev, target_value: parseInt(e.target.value) || 0 } : null)}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Birim</label>
+                    <Input
+                      value={editingGoal.unit || ''}
+                      onChange={(e) => setEditingGoal(prev => prev ? { ...prev, unit: e.target.value } : null)}
+                      placeholder="kg, saat, ₺"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Bitiş Tarihi</label>
+                    <Input
+                      type="date"
+                      value={editingGoal.deadline || ''}
+                      onChange={(e) => setEditingGoal(prev => prev ? { ...prev, deadline: e.target.value } : null)}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Kategori</label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {CATEGORIES.map((cat) => (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => setEditingGoal(prev => prev ? { ...prev, category: cat.id } : null)}
+                        className={cn(
+                          'flex flex-col items-center gap-1 p-2 rounded-lg transition-all',
+                          editingGoal.category === cat.id 
+                            ? 'bg-primary/20 ring-2 ring-primary' 
+                            : 'bg-secondary hover:bg-secondary/80'
+                        )}
+                      >
+                        <span className="text-lg">{GOAL_CATEGORY_ICONS[cat.id]}</span>
+                        <span className="text-[10px]">{cat.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex gap-2 pt-4">
+                  <Button variant="outline" onClick={() => { setShowEditModal(false); setEditingGoal(null); }} className="flex-1">
+                    İptal
+                  </Button>
+                  <Button onClick={handleSaveEdit} className="flex-1">
+                    Kaydet
                   </Button>
                 </div>
               </div>

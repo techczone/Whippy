@@ -102,8 +102,10 @@ export function Sidebar() {
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed top-0 left-0 h-full bg-card border-r border-border z-40',
+          'fixed top-0 left-0 bg-card border-r border-border z-40',
           'flex flex-col transition-all duration-300 ease-in-out',
+          // Height - mobile: leave space for bottom nav (64px), desktop: full
+          'h-[calc(100dvh-64px)] md:h-dvh',
           // Desktop
           'md:relative md:translate-x-0',
           sidebarOpen ? 'md:w-64' : 'md:w-20',
@@ -112,7 +114,7 @@ export function Sidebar() {
         )}
       >
         {/* Logo */}
-        <div className="p-4 border-b border-border">
+        <div className="p-4 border-b border-border shrink-0">
           <Link href="/dashboard" className="flex items-center" onClick={handleNavClick}>
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center shadow-lg shadow-orange-500/30 shrink-0">
               <span className="text-lg">🔥</span>
@@ -132,8 +134,8 @@ export function Sidebar() {
           </Link>
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+        {/* Navigation - scrollable area */}
+        <nav className="flex-1 p-3 space-y-1 overflow-y-auto min-h-0">
           {NAV_ITEMS.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
             const Icon = item.icon
@@ -169,8 +171,8 @@ export function Sidebar() {
           })}
         </nav>
 
-        {/* Bottom section */}
-        <div className="p-3 border-t border-border space-y-1">
+        {/* Bottom section - Profile, Settings, Language */}
+        <div className="p-3 border-t border-border shrink-0">
           {/* Profile & Settings */}
           {BOTTOM_NAV_ITEMS.map((item) => {
             const isActive = pathname === item.href
@@ -180,7 +182,7 @@ export function Sidebar() {
               <Link key={item.href} href={item.href} onClick={handleNavClick}>
                 <motion.div
                   className={cn(
-                    'flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all',
+                    'flex items-center gap-3 px-3 py-2 rounded-xl transition-all',
                     isActive 
                       ? 'bg-primary text-primary-foreground' 
                       : 'hover:bg-accent/50 text-muted-foreground hover:text-foreground'
@@ -210,7 +212,7 @@ export function Sidebar() {
           <motion.button
             onClick={toggleLanguage}
             className={cn(
-              'flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all w-full',
+              'flex items-center gap-3 px-3 py-2 rounded-xl transition-all w-full mt-1',
               'hover:bg-accent/50 text-muted-foreground hover:text-foreground'
             )}
             whileHover={{ x: 4 }}
@@ -254,7 +256,7 @@ export function Sidebar() {
   )
 }
 
-// Mobile bottom navigation (without language toggle - it's in sidebar now)
+// Mobile bottom navigation
 export function MobileBottomNav() {
   const pathname = usePathname()
   const { t } = useTranslation()
@@ -268,8 +270,8 @@ export function MobileBottomNav() {
   ]
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border md:hidden z-40">
-      <div className="flex items-center justify-around py-2">
+    <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border md:hidden z-40 h-16">
+      <div className="flex items-center justify-around h-full">
         {mobileItems.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
           const Icon = item.icon

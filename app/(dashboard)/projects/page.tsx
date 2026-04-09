@@ -7,16 +7,10 @@ import { cn, COLOR_OPTIONS } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
-import { ProjectCard, ProjectsSummary } from '@/components/projects/project-card'
+import { ProjectCard } from '@/components/projects/project-card'
+import { useProjects } from '@/hooks/use-projects'
+import { useAuth } from '@/hooks/use-auth'
 import type { Project } from '@/types'
-
-const DEMO_PROJECTS: Project[] = [
-  { id: '1', user_id: '1', name: 'Kişisel Web Sitesi', description: 'Portfolio ve blog sitesi geliştirme', progress: 65, status: 'active', priority: 'high', deadline: '2025-05-01', color: '#8B5CF6', created_at: '', updated_at: '' },
-  { id: '2', user_id: '1', name: 'Kitap Yazımı', description: 'Kişisel gelişim kitabı', progress: 30, status: 'active', priority: 'medium', deadline: '2025-12-31', color: '#F97316', created_at: '', updated_at: '' },
-  { id: '3', user_id: '1', name: 'Online Kurs', description: 'Programlama eğitimi hazırlığı', progress: 15, status: 'paused', priority: 'low', deadline: '2025-08-01', color: '#22C55E', created_at: '', updated_at: '' },
-  { id: '4', user_id: '1', name: 'Fitness Programı', description: '12 haftalık dönüşüm programı', progress: 100, status: 'completed', priority: 'high', deadline: '2025-03-01', color: '#EC4899', created_at: '', updated_at: '' },
-  { id: '5', user_id: '1', name: 'Dil Öğrenme', description: 'İspanyolca B2 seviyesi', progress: 45, status: 'active', priority: 'medium', deadline: '2025-09-01', color: '#3B82F6', created_at: '', updated_at: '' },
-]
 
 const PRIORITIES = [
   { id: 'low', label: 'Düşük', color: 'bg-blue-500' },
@@ -25,7 +19,21 @@ const PRIORITIES = [
 ]
 
 export default function ProjectsPage() {
-  const [projects, setProjects] = useState(DEMO_PROJECTS)
+  const { user } = useAuth()
+  const userId = user?.id
+
+  const { 
+    projects, 
+    loading,
+    activeCount,
+    completedCount,
+    pausedCount,
+    addProject,
+    updateProgress,
+    updateProject,
+    deleteProject 
+  } = useProjects(userId)
+
   const [filter, setFilter] = useState<'all' | 'active' | 'paused' | 'completed'>('all')
   const [showAddModal, setShowAddModal] = useState(false)
   const [newProject, setNewProject] = useState({
@@ -41,42 +49,39 @@ export default function ProjectsPage() {
     return p.status === filter
   })
 
-  const handleUpdateProgress = (id: string, progress: number) => {
-    setProjects(prev => prev.map(p => 
-      p.id === id ? { ...p, progress: Math.min(100, Math.max(0, progress)) } : p
-    ))
+  const handleUpdateProgress = async (id: string, progress: number) => {
+    await updateProgress(id, progress)
   }
 
-  const handleStatusChange = (id: string, status: Project['status']) => {
-    setProjects(prev => prev.map(p => 
-      p.id === id ? { ...p, status, progress: status === 'completed' ? 100 : p.progress } : p
-    ))
+  const handleStatusChange = async (id: string, status: Project['status']) => {
+    await updateProject(id, { status, progress: status === 'completed' ? 100 : undefined })
   }
 
-  const handleDelete = (id: string) => {
-    setProjects(prev => prev.filter(p => p.id !== id))
+  const handleDelete = async (id: string) => {
+    await deleteProject(id)
   }
 
-  const handleAddProject = () => {
+  const handleAddProject = async () => {
     if (!newProject.name.trim()) return
     
-    const project: Project = {
-      id: Date.now().toString(),
-      user_id: '1',
+    await addProject({
       name: newProject.name,
       description: newProject.description || null,
-      progress: 0,
-      status: 'active',
       priority: newProject.priority,
       deadline: newProject.deadline || null,
       color: newProject.color,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }
+    })
     
-    setProjects(prev => [...prev, project])
     setNewProject({ name: '', description: '', priority: 'medium', deadline: '', color: COLOR_OPTIONS[0] })
     setShowAddModal(false)
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+      </div>
+    )
   }
 
   return (
@@ -92,9 +97,6 @@ export default function ProjectsPage() {
           Yeni Proje
         </Button>
       </div>
-
-      {/* Summary */}
-      <ProjectsSummary projects={projects} />
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -119,7 +121,7 @@ export default function ProjectsPage() {
                 <Clock className="w-5 h-5 text-blue-500" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{projects.filter(p => p.status === 'active').length}</p>
+                <p className="text-2xl font-bold">{activeCount}</p>
                 <p className="text-xs text-muted-foreground">Aktif</p>
               </div>
             </div>
@@ -133,7 +135,7 @@ export default function ProjectsPage() {
                 <Pause className="w-5 h-5 text-yellow-500" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{projects.filter(p => p.status === 'paused').length}</p>
+                <p className="text-2xl font-bold">{pausedCount}</p>
                 <p className="text-xs text-muted-foreground">Duraklatılmış</p>
               </div>
             </div>
@@ -143,11 +145,11 @@ export default function ProjectsPage() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-success/20 flex items-center justify-center">
-                <CheckCircle className="w-5 h-5 text-success" />
+              <div className="w-10 h-10 rounded-xl bg-green-500/20 flex items-center justify-center">
+                <CheckCircle className="w-5 h-5 text-green-500" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{projects.filter(p => p.status === 'completed').length}</p>
+                <p className="text-2xl font-bold">{completedCount}</p>
                 <p className="text-xs text-muted-foreground">Tamamlanan</p>
               </div>
             </div>
@@ -187,7 +189,15 @@ export default function ProjectsPage() {
       {filteredProjects.length === 0 && (
         <div className="text-center py-12">
           <FolderKanban className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
-          <p className="text-muted-foreground">Bu kategoride proje yok</p>
+          <p className="text-muted-foreground">
+            {filter === 'all' ? 'Henüz proje eklenmemiş' : 'Bu kategoride proje yok'}
+          </p>
+          {filter === 'all' && (
+            <Button className="mt-4" onClick={() => setShowAddModal(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              İlk Projenizi Ekleyin
+            </Button>
+          )}
         </div>
       )}
 

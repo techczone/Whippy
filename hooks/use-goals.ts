@@ -42,20 +42,19 @@ export function useGoals(userId: string | undefined) {
     fetchGoals()
   }, [fetchGoals])
 
-  // Add goal
-  const addGoal = async (goal: { name: string; title?: string; description?: string | null; target_value: number; unit: string; deadline?: string | null; category: string }) => {
+  // Add goal - sadece title kullan (name yok tabloda)
+  const addGoal = async (goal: { title: string; description?: string | null; target_value: number; unit: string; deadline?: string | null; category: string }) => {
     if (!userId) return null
 
     try {
       const { data, error } = await supabase
         .from('goals')
         .insert({
-          name: goal.name,
-          title: goal.title || goal.name,
-          description: goal.description,
+          title: goal.title,
+          description: goal.description || null,
           target_value: goal.target_value,
           unit: goal.unit,
-          deadline: goal.deadline,
+          deadline: goal.deadline || null,
           category: goal.category,
           user_id: userId,
           current_value: 0,

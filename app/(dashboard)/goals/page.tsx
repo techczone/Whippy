@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, Target, TrendingUp, CheckCircle, Clock } from 'lucide-react'
 import { cn, GOAL_CATEGORY_ICONS } from '@/lib/utils'
@@ -42,7 +42,6 @@ export default function GoalsPage() {
   const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all')
   const [showAddModal, setShowAddModal] = useState(false)
   const [newGoal, setNewGoal] = useState({
-    name: '',
     title: '',
     description: '',
     target_value: 0,
@@ -70,11 +69,10 @@ export default function GoalsPage() {
   }
 
   const handleAddGoal = async () => {
-    if (!newGoal.name.trim()) return
+    if (!newGoal.title.trim()) return
     
     await addGoal({
-      name: newGoal.name,
-      title: newGoal.name,
+      title: newGoal.title,
       description: newGoal.description || null,
       target_value: newGoal.target_value,
       unit: newGoal.unit,
@@ -82,7 +80,7 @@ export default function GoalsPage() {
       category: newGoal.category,
     })
     
-    setNewGoal({ name: '', title: '', description: '', target_value: 0, unit: '', deadline: '', category: 'personal' })
+    setNewGoal({ title: '', description: '', target_value: 0, unit: '', deadline: '', category: 'personal' })
     setShowAddModal(false)
   }
 
@@ -141,8 +139,8 @@ export default function GoalsPage() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-success/20 flex items-center justify-center">
-                <CheckCircle className="w-5 h-5 text-success" />
+              <div className="w-10 h-10 rounded-xl bg-green-500/20 flex items-center justify-center">
+                <CheckCircle className="w-5 h-5 text-green-500" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{completedCount}</p>
@@ -230,8 +228,8 @@ export default function GoalsPage() {
                 <div>
                   <label className="text-sm font-medium mb-2 block">Hedef Adı</label>
                   <Input
-                    value={newGoal.name}
-                    onChange={(e) => setNewGoal(prev => ({ ...prev, name: e.target.value }))}
+                    value={newGoal.title}
+                    onChange={(e) => setNewGoal(prev => ({ ...prev, title: e.target.value }))}
                     placeholder="örn: 10 kg ver"
                   />
                 </div>

@@ -410,7 +410,9 @@ function getGreeting() {
   return 'İyi Akşamlar 👋'
 }
 
-function calculateHealthScore(health: Partial<HealthEntry>) {
+function calculateHealthScore(health: Partial<HealthEntry> | null | undefined) {
+  if (!health) return 50 // Default score if no health data
+  
   let score = 50 // Base score
   
   if (health.water_liters) {

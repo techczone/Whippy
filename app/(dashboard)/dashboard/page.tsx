@@ -17,8 +17,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { StatCard } from '@/components/dashboard/stat-card'
 import { MoodSelector, MoodWeekView } from '@/components/mood/mood-selector'
-import { HealthSummaryCard } from '@/components/health/health-tracker'
-import { GoalCard, GoalsSummary } from '@/components/goals/goal-card'
+import { GoalCard } from '@/components/goals/goal-card'
 import { useAppStore } from '@/lib/store'
 import { useHabitsWithStatus } from '@/hooks/use-habits'
 import { useAuth } from '@/hooks/use-auth'
@@ -393,7 +392,53 @@ export default function DashboardPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <HealthSummaryCard health={health} score={healthScore} />
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <svg className="w-20 h-20 -rotate-90">
+                    <circle
+                      className="stroke-muted"
+                      strokeWidth="6"
+                      fill="transparent"
+                      r="32"
+                      cx="40"
+                      cy="40"
+                    />
+                    <circle
+                      className="stroke-primary transition-all duration-500"
+                      strokeWidth="6"
+                      strokeLinecap="round"
+                      fill="transparent"
+                      r="32"
+                      cx="40"
+                      cy="40"
+                      style={{
+                        strokeDasharray: `${2 * Math.PI * 32}`,
+                        strokeDashoffset: `${2 * Math.PI * 32 * (1 - healthScore / 100)}`,
+                      }}
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-xl font-bold">{healthScore}</span>
+                  </div>
+                </div>
+                <div className="flex-1 space-y-2 text-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="text-blue-400">💧</span>
+                    <span className="text-muted-foreground">Su:</span>
+                    <span className="font-medium">{health?.water_liters || 0} L</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-purple-400">🌙</span>
+                    <span className="text-muted-foreground">Uyku:</span>
+                    <span className="font-medium">{health?.sleep_hours || 0} sa</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-green-400">💪</span>
+                    <span className="text-muted-foreground">Egzersiz:</span>
+                    <span className="font-medium">{health?.exercise_minutes || 0} dk</span>
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>

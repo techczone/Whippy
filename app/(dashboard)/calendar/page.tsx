@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { 
   ChevronLeft, 
@@ -8,11 +8,13 @@ import {
   Calendar as CalendarIcon,
   Target,
   Heart,
-  Flame
+  Smile
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
+import { useAuth } from '@/hooks/use-auth'
+import { createClient } from '@/lib/supabase/client'
 
 const DAYS = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz']
 const MONTHS = [
@@ -20,18 +22,29 @@ const MONTHS = [
   'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'
 ]
 
-// Demo data - tamamlanan günler
-const completedDays = [1, 2, 3, 5, 6, 7, 8, 12, 13, 14, 15, 19, 20, 21, 26, 27, 28]
-const partialDays = [4, 9, 16, 22, 29]
-const moodData: Record<number, number> = {
-  1: 4, 2: 5, 3: 4, 4: 3, 5: 4, 6: 5, 7: 5,
-  8: 3, 9: 2, 12: 4, 13: 4, 14: 5, 15: 4,
-  19: 3, 20: 4, 21: 5, 26: 4, 27: 5, 28: 4
+const MOOD_EMOJIS: Record<number, string> = {
+  1: '😢',
+  2: '😕',
+  3: '😐',
+  4: '🙂',
+  5: '😄'
 }
 
 export default function CalendarPage() {
+  const { user } = useAuth()
+  const userId = user?.id
+  
   const [currentDate, setCurrentDate] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState<number | null>(new Date().getDate())
+  const [loading, setLoading] = useState(true)
+  const [monthData, setMonthData] = useState({
+    habitLogs: [] as any[],
+    habits: [] as any[],
+    moodEntries: [] as any[],
+    healthEntries: [] as any[],
+  })
+
+  const supabase = useMemo(() => createClient(), [])
 
   const year = currentDate.getFullYear()
   const month = currentDate.getMonth()
@@ -43,62 +56,127 @@ export default function CalendarPage() {
   // Pazartesi'den başlat (0 = Pazartesi olacak şekilde ayarla)
   const startDay = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1
 
+  // Fetch month data
+  useEffect(() => {
+    if (!userId) {
+      setLoading(false)
+      return
+    }
+
+    const fetchMonthData = async () => {
+      setLoading(true)
+      
+      const startDate = `${year}-${String(month + 1).padStart(2, '0')}-01`
+      const endDate = `${year}-${String(month + 1).padStart(2, '0')}-${daysInMonth}`
+
+      try {
+        const [habitsRes, logsRes, moodRes, healthRes] = await Promise.all([
+          supabase.from('habits').select('*').eq('user_id', userId).eq('archived', false),
+          supabase.from('habit_logs').select('*').eq('user_id', userId).gte('date', startDate).lte('date', endDate),
+          supabase.from('mood_entries').select('*').eq('user_id', userId).gte('date', startDate).lte('date', endDate),
+          supabase.from('health_entries').select('*').eq('user_id', userId).gte('date', startDate).lte('date', endDate),
+        ])
+
+        setMonthData({
+          habits: habitsRes.data || [],
+          habitLogs: logsRes.data || [],
+          moodEntries: moodRes.data || [],
+          healthEntries: healthRes.data || [],
+        })
+      } catch (err) {
+        console.error('Error fetching calendar data:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchMonthData()
+  }, [userId, year, month, daysInMonth, supabase])
+
   const prevMonth = () => {
     setCurrentDate(new Date(year, month - 1, 1))
+    setSelectedDate(null)
   }
 
   const nextMonth = () => {
     setCurrentDate(new Date(year, month + 1, 1))
+    setSelectedDate(null)
   }
 
-  const getDayStatus = (day: number) => {
-    if (completedDays.includes(day)) return 'completed'
-    if (partialDays.includes(day)) return 'partial'
-    return 'none'
+  // Get day status from real data
+  const getDayData = (day: number) => {
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+    
+    const dayLogs = monthData.habitLogs.filter(l => l.date === dateStr && l.completed)
+    const totalHabits = monthData.habits.length
+    const completedCount = dayLogs.length
+    
+    const mood = monthData.moodEntries.find(m => m.date === dateStr)
+    const health = monthData.healthEntries.find(h => h.date === dateStr)
+    
+    let status = 'none'
+    if (totalHabits > 0) {
+      const rate = completedCount / totalHabits
+      if (rate >= 0.8) status = 'completed'
+      else if (rate >= 0.3) status = 'partial'
+    }
+    
+    return {
+      status,
+      completedCount,
+      totalHabits,
+      mood: mood?.value,
+      health,
+    }
   }
 
-  const getMoodEmoji = (day: number) => {
-    const mood = moodData[day]
-    if (!mood) return null
-    const emojis = ['', '😫', '😔', '😐', '🙂', '😄']
-    return emojis[mood]
+  // Selected day details
+  const selectedDayData = selectedDate ? getDayData(selectedDate) : null
+
+  const isToday = (day: number) => {
+    const today = new Date()
+    return day === today.getDate() && month === today.getMonth() && year === today.getFullYear()
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+      </div>
+    )
   }
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <CalendarIcon className="w-7 h-7 text-primary" />
-            Takvim
-          </h1>
-          <p className="text-muted-foreground">Alışkanlık geçmişini görüntüle</p>
+          <h1 className="text-2xl md:text-3xl font-bold">Takvim</h1>
+          <p className="text-muted-foreground">Günlük aktivitelerini görselleştir</p>
         </div>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Calendar */}
         <Card className="lg:col-span-2">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <Button variant="ghost" size="icon" onClick={prevMonth}>
-              <ChevronLeft className="w-5 h-5" />
-            </Button>
-            <CardTitle className="text-xl">
-              {MONTHS[month]} {year}
-            </CardTitle>
-            <Button variant="ghost" size="icon" onClick={nextMonth}>
-              <ChevronRight className="w-5 h-5" />
-            </Button>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <Button variant="ghost" size="icon" onClick={prevMonth}>
+                <ChevronLeft className="w-5 h-5" />
+              </Button>
+              <CardTitle className="text-xl">
+                {MONTHS[month]} {year}
+              </CardTitle>
+              <Button variant="ghost" size="icon" onClick={nextMonth}>
+                <ChevronRight className="w-5 h-5" />
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             {/* Day headers */}
             <div className="grid grid-cols-7 gap-1 mb-2">
               {DAYS.map((day) => (
-                <div
-                  key={day}
-                  className="text-center text-sm font-medium text-muted-foreground py-2"
-                >
+                <div key={day} className="text-center text-sm font-medium text-muted-foreground py-2">
                   {day}
                 </div>
               ))}
@@ -106,39 +184,43 @@ export default function CalendarPage() {
 
             {/* Calendar grid */}
             <div className="grid grid-cols-7 gap-1">
-              {/* Empty cells for days before month starts */}
+              {/* Empty cells for days before the 1st */}
               {Array.from({ length: startDay }).map((_, i) => (
                 <div key={`empty-${i}`} className="aspect-square" />
               ))}
 
-              {/* Days of month */}
+              {/* Days of the month */}
               {Array.from({ length: daysInMonth }).map((_, i) => {
                 const day = i + 1
-                const status = getDayStatus(day)
-                const isToday = day === new Date().getDate() && 
-                               month === new Date().getMonth() && 
-                               year === new Date().getFullYear()
-                const isSelected = day === selectedDate
-                const mood = getMoodEmoji(day)
+                const dayData = getDayData(day)
+                const today = isToday(day)
+                const selected = selectedDate === day
+                const future = new Date(year, month, day) > new Date()
 
                 return (
                   <motion.button
                     key={day}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
                     onClick={() => setSelectedDate(day)}
                     className={cn(
-                      'aspect-square rounded-xl flex flex-col items-center justify-center text-sm font-medium transition-all relative',
-                      status === 'completed' && 'bg-green-500/20 text-green-500',
-                      status === 'partial' && 'bg-yellow-500/20 text-yellow-500',
-                      status === 'none' && 'hover:bg-secondary',
-                      isToday && 'ring-2 ring-primary',
-                      isSelected && 'bg-primary text-primary-foreground'
+                      'aspect-square rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all relative',
+                      today && 'ring-2 ring-primary ring-offset-2 ring-offset-background',
+                      selected && 'bg-primary text-primary-foreground',
+                      !selected && dayData.status === 'completed' && 'bg-green-500/20',
+                      !selected && dayData.status === 'partial' && 'bg-yellow-500/20',
+                      !selected && !today && 'hover:bg-accent',
+                      future && 'opacity-40'
                     )}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
                   >
-                    <span>{day}</span>
-                    {mood && (
-                      <span className="text-xs absolute bottom-1">{mood}</span>
+                    <span className={cn(
+                      'text-sm font-medium',
+                      selected ? 'text-primary-foreground' : ''
+                    )}>
+                      {day}
+                    </span>
+                    {dayData.mood && !selected && (
+                      <span className="text-xs">{MOOD_EMOJIS[dayData.mood]}</span>
                     )}
                   </motion.button>
                 )
@@ -146,116 +228,133 @@ export default function CalendarPage() {
             </div>
 
             {/* Legend */}
-            <div className="flex items-center justify-center gap-6 mt-6 pt-4 border-t border-border">
+            <div className="flex items-center justify-center gap-6 mt-6 text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-green-500/50" />
-                <span className="text-sm text-muted-foreground">Tamamlandı</span>
+                <div className="w-4 h-4 rounded bg-green-500/20" />
+                <span>Tamamlandı</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-yellow-500/50" />
-                <span className="text-sm text-muted-foreground">Kısmen</span>
+                <div className="w-4 h-4 rounded bg-yellow-500/20" />
+                <span>Kısmi</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-secondary" />
-                <span className="text-sm text-muted-foreground">Boş</span>
+                <div className="w-4 h-4 rounded ring-2 ring-primary" />
+                <span>Bugün</span>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Selected Day Details */}
+        {/* Selected day details */}
         <div className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">
-                {selectedDate} {MONTHS[month]} {year}
+              <CardTitle className="flex items-center gap-2">
+                <CalendarIcon className="w-5 h-5 text-primary" />
+                {selectedDate ? `${selectedDate} ${MONTHS[month]}` : 'Bir gün seçin'}
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {selectedDate && getDayStatus(selectedDate) !== 'none' ? (
-                <>
+            <CardContent>
+              {selectedDayData ? (
+                <div className="space-y-4">
                   {/* Habits */}
-                  <div className="space-y-2">
-                    <h4 className="text-sm font-medium flex items-center gap-2">
-                      <Target className="w-4 h-4 text-primary" />
-                      Alışkanlıklar
-                    </h4>
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between text-sm">
-                        <span>Sabah meditasyonu</span>
-                        <span className="text-green-500">✓</span>
-                      </div>
-                      <div className="flex items-center justify-between text-sm">
-                        <span>30 dk egzersiz</span>
-                        <span className="text-green-500">✓</span>
-                      </div>
-                      <div className="flex items-center justify-between text-sm">
-                        <span>2.5L su iç</span>
-                        <span className={getDayStatus(selectedDate) === 'partial' ? 'text-yellow-500' : 'text-green-500'}>
-                          {getDayStatus(selectedDate) === 'partial' ? '○' : '✓'}
-                        </span>
-                      </div>
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/50">
+                    <Target className="w-5 h-5 text-primary" />
+                    <div className="flex-1">
+                      <p className="font-medium">Alışkanlıklar</p>
+                      <p className="text-sm text-muted-foreground">
+                        {selectedDayData.completedCount} / {selectedDayData.totalHabits} tamamlandı
+                      </p>
                     </div>
+                    <span className={cn(
+                      'text-lg font-bold',
+                      selectedDayData.status === 'completed' ? 'text-green-500' :
+                      selectedDayData.status === 'partial' ? 'text-yellow-500' : 'text-muted-foreground'
+                    )}>
+                      {selectedDayData.totalHabits > 0 
+                        ? Math.round((selectedDayData.completedCount / selectedDayData.totalHabits) * 100)
+                        : 0}%
+                    </span>
                   </div>
 
                   {/* Mood */}
-                  {moodData[selectedDate] && (
-                    <div className="space-y-2">
-                      <h4 className="text-sm font-medium flex items-center gap-2">
-                        <Heart className="w-4 h-4 text-pink-500" />
-                        Ruh Hali
-                      </h4>
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/50">
+                    <Smile className="w-5 h-5 text-yellow-500" />
+                    <div className="flex-1">
+                      <p className="font-medium">Ruh Hali</p>
+                    </div>
+                    <span className="text-2xl">
+                      {selectedDayData.mood ? MOOD_EMOJIS[selectedDayData.mood] : '—'}
+                    </span>
+                  </div>
+
+                  {/* Health */}
+                  {selectedDayData.health && (
+                    <div className="p-3 rounded-lg bg-secondary/50 space-y-2">
                       <div className="flex items-center gap-2">
-                        <span className="text-2xl">{getMoodEmoji(selectedDate)}</span>
-                        <span className="text-sm text-muted-foreground">
-                          {['', 'Çok Kötü', 'Kötü', 'Orta', 'İyi', 'Harika'][moodData[selectedDate]]}
-                        </span>
+                        <Heart className="w-5 h-5 text-red-500" />
+                        <p className="font-medium">Sağlık</p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        {selectedDayData.health.water_liters && (
+                          <div className="flex items-center gap-1">
+                            <span>💧</span>
+                            <span>{selectedDayData.health.water_liters}L</span>
+                          </div>
+                        )}
+                        {selectedDayData.health.sleep_hours && (
+                          <div className="flex items-center gap-1">
+                            <span>🌙</span>
+                            <span>{selectedDayData.health.sleep_hours}sa</span>
+                          </div>
+                        )}
+                        {selectedDayData.health.exercise_minutes && (
+                          <div className="flex items-center gap-1">
+                            <span>💪</span>
+                            <span>{selectedDayData.health.exercise_minutes}dk</span>
+                          </div>
+                        )}
+                        {selectedDayData.health.steps && (
+                          <div className="flex items-center gap-1">
+                            <span>👣</span>
+                            <span>{selectedDayData.health.steps}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
-
-                  {/* Streak */}
-                  <div className="space-y-2">
-                    <h4 className="text-sm font-medium flex items-center gap-2">
-                      <Flame className="w-4 h-4 text-orange-500" />
-                      Seri
-                    </h4>
-                    <p className="text-sm text-muted-foreground">
-                      Bu gün {selectedDate <= 7 ? selectedDate : Math.floor(Math.random() * 10) + 5} günlük serinin parçası
-                    </p>
-                  </div>
-                </>
+                </div>
               ) : (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  Bu gün için veri yok
+                <p className="text-center text-muted-foreground py-8">
+                  Detayları görmek için takvimden bir gün seçin
                 </p>
               )}
             </CardContent>
           </Card>
 
-          {/* Monthly Stats */}
+          {/* Summary */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Aylık Özet</CardTitle>
+              <CardTitle className="text-lg">Bu Ay Özet</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Tamamlanan gün</span>
-                <span className="font-semibold text-green-500">{completedDays.length}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Kısmen tamamlanan</span>
-                <span className="font-semibold text-yellow-500">{partialDays.length}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Başarı oranı</span>
-                <span className="font-semibold text-primary">
-                  %{Math.round(((completedDays.length + partialDays.length * 0.5) / daysInMonth) * 100)}
+                <span className="text-muted-foreground">Kayıtlı gün</span>
+                <span className="font-medium">
+                  {new Set(monthData.habitLogs.map(l => l.date)).size} gün
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">En uzun seri</span>
-                <span className="font-semibold text-orange-500">7 gün 🔥</span>
+                <span className="text-muted-foreground">Tamamlanan alışkanlık</span>
+                <span className="font-medium">
+                  {monthData.habitLogs.filter(l => l.completed).length}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Ruh hali girişi</span>
+                <span className="font-medium">
+                  {monthData.moodEntries.length} gün
+                </span>
               </div>
             </CardContent>
           </Card>

@@ -34,6 +34,9 @@ export function GoalCard({
   const isComplete = goal.status === 'completed' || progress >= 100
   const isPaused = goal.status === 'paused'
   const categoryIcon = GOAL_CATEGORY_ICONS[goal.category] || '📌'
+  
+  // title veya name kullan (veritabanında title var)
+  const goalTitle = goal.title || goal.name || 'Hedef'
 
   const getProgressVariant = () => {
     if (isComplete) return 'success'
@@ -70,7 +73,7 @@ export function GoalCard({
         <div className="flex items-center gap-3 mb-2">
           <span className="text-lg">{categoryIcon}</span>
           <span className={cn('font-medium truncate flex-1', isComplete && 'line-through')}>
-            {goal.name}
+            {goalTitle}
           </span>
           {isComplete && <CheckCircle className="w-4 h-4 text-success" />}
         </div>
@@ -110,7 +113,7 @@ export function GoalCard({
           </div>
           <div>
             <h3 className={cn('font-semibold', isComplete && 'line-through text-muted-foreground')}>
-              {goal.name}
+              {goalTitle}
             </h3>
             {goal.description && (
               <p className="text-sm text-muted-foreground line-clamp-1">{goal.description}</p>

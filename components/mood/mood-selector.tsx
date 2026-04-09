@@ -127,7 +127,7 @@ export function MoodBadge({
   )
 }
 
-// Weekly mood display
+// Weekly mood display - düzeltilmiş versiyon
 export function MoodWeekView({
   moods,
   onSelectDay,
@@ -135,25 +135,31 @@ export function MoodWeekView({
   moods: { date: string; value: 1 | 2 | 3 | 4 | 5 }[]
   onSelectDay?: (date: string) => void
 }) {
-  const days = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz']
+  // Türkçe gün isimleri (0 = Pazar, 1 = Pazartesi, ...)
+  const dayNames = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt']
   
   // Get last 7 days
   const last7Days = Array.from({ length: 7 }, (_, i) => {
     const date = new Date()
     date.setDate(date.getDate() - (6 - i))
-    return date.toISOString().split('T')[0]
+    return {
+      dateStr: date.toISOString().split('T')[0],
+      dayName: dayNames[date.getDay()], // Gerçek gün ismi
+    }
   })
+
+  const todayStr = new Date().toISOString().split('T')[0]
 
   return (
     <div className="flex items-center justify-between gap-1">
-      {last7Days.map((date, index) => {
-        const mood = moods.find(m => m.date === date)
-        const isToday = date === new Date().toISOString().split('T')[0]
+      {last7Days.map(({ dateStr, dayName }) => {
+        const mood = moods.find(m => m.date === dateStr)
+        const isToday = dateStr === todayStr
         
         return (
           <motion.button
-            key={date}
-            onClick={() => onSelectDay?.(date)}
+            key={dateStr}
+            onClick={() => onSelectDay?.(dateStr)}
             className={cn(
               'flex flex-col items-center gap-1 p-2 rounded-lg transition-colors',
               isToday ? 'bg-primary/10' : 'hover:bg-accent/50',
@@ -162,7 +168,12 @@ export function MoodWeekView({
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
-            <span className="text-xs text-muted-foreground">{days[index]}</span>
+            <span className={cn(
+              'text-xs',
+              isToday ? 'text-primary font-medium' : 'text-muted-foreground'
+            )}>
+              {dayName}
+            </span>
             <span className="text-xl">
               {mood ? MOOD_EMOJIS[mood.value] : '○'}
             </span>

@@ -1,23 +1,16 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, Target, TrendingUp, CheckCircle, Clock } from 'lucide-react'
-import { cn, GOAL_CATEGORY_ICONS, COLOR_OPTIONS } from '@/lib/utils'
+import { cn, GOAL_CATEGORY_ICONS } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
-import { GoalCard, GoalsSummary } from '@/components/goals/goal-card'
+import { GoalCard } from '@/components/goals/goal-card'
+import { useGoals } from '@/hooks/use-goals'
+import { useAuth } from '@/hooks/use-auth'
 import type { Goal, GoalCategory } from '@/types'
-
-const DEMO_GOALS: Goal[] = [
-  { id: '1', user_id: '1', title: '10 kg ver', name: '10 kg ver', description: 'Sağlıklı kilo hedefi', target_value: 10, current_value: 4, unit: 'kg', deadline: '2025-06-01', category: 'health', status: 'active', created_at: '', updated_at: '' },
-  { id: '2', user_id: '1', title: '50 kitap oku', name: '50 kitap oku', description: 'Yıllık okuma hedefi', target_value: 50, current_value: 18, unit: 'kitap', deadline: '2025-12-31', category: 'education', status: 'active', created_at: '', updated_at: '' },
-  { id: '3', user_id: '1', title: '₺100.000 biriktir', name: '₺100.000 biriktir', description: 'Acil durum fonu', target_value: 100000, current_value: 35000, unit: '₺', deadline: '2025-12-31', category: 'finance', status: 'active', created_at: '', updated_at: '' },
-  { id: '4', user_id: '1', title: 'İngilizce C1', name: 'İngilizce C1', description: 'Dil seviyesi hedefi', target_value: 100, current_value: 65, unit: '%', deadline: '2025-09-01', category: 'education', status: 'active', created_at: '', updated_at: '' },
-  { id: '5', user_id: '1', title: 'Maraton koş', name: 'Maraton koş', description: '42 km maraton tamamla', target_value: 42, current_value: 21, unit: 'km', deadline: '2025-10-15', category: 'fitness', status: 'active', created_at: '', updated_at: '' },
-  { id: '6', user_id: '1', title: '30 gün meditasyon', name: '30 gün meditasyon', description: 'Kesintisiz meditasyon serisi', target_value: 30, current_value: 30, unit: 'gün', deadline: '2025-02-01', category: 'personal', status: 'completed', created_at: '', updated_at: '' },
-]
 
 const CATEGORIES: { id: GoalCategory; label: string }[] = [
   { id: 'health', label: 'Sağlık' },
@@ -31,11 +24,26 @@ const CATEGORIES: { id: GoalCategory; label: string }[] = [
 ]
 
 export default function GoalsPage() {
-  const [goals, setGoals] = useState(DEMO_GOALS)
+  const { user } = useAuth()
+  const userId = user?.id
+
+  const { 
+    goals, 
+    loading, 
+    activeCount, 
+    completedCount, 
+    avgProgress,
+    addGoal,
+    updateProgress,
+    updateGoal,
+    deleteGoal 
+  } = useGoals(userId)
+
   const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all')
   const [showAddModal, setShowAddModal] = useState(false)
   const [newGoal, setNewGoal] = useState({
     name: '',
+    title: '',
     description: '',
     target_value: 0,
     unit: '',
@@ -49,47 +57,41 @@ export default function GoalsPage() {
     return true
   })
 
-  const activeCount = goals.filter(g => g.status === 'active').length
-  const completedCount = goals.filter(g => g.status === 'completed').length
-  const avgProgress = goals.length > 0 
-    ? Math.round(goals.reduce((acc, g) => acc + (g.current_value / g.target_value) * 100, 0) / goals.length)
-    : 0
-
-  const handleUpdateProgress = (id: string, value: number) => {
-    setGoals(prev => prev.map(g => 
-      g.id === id ? { ...g, current_value: Math.min(g.target_value, Math.max(0, value)) } : g
-    ))
+  const handleUpdateProgress = async (id: string, value: number) => {
+    await updateProgress(id, value)
   }
 
-  const handleStatusChange = (id: string, status: Goal['status']) => {
-    setGoals(prev => prev.map(g => g.id === id ? { ...g, status } : g))
+  const handleStatusChange = async (id: string, status: Goal['status']) => {
+    await updateGoal(id, { status })
   }
 
-  const handleDelete = (id: string) => {
-    setGoals(prev => prev.filter(g => g.id !== id))
+  const handleDelete = async (id: string) => {
+    await deleteGoal(id)
   }
 
-  const handleAddGoal = () => {
+  const handleAddGoal = async () => {
     if (!newGoal.name.trim()) return
     
-    const goal: Goal = {
-      id: Date.now().toString(),
-      user_id: '1',
+    await addGoal({
       name: newGoal.name,
+      title: newGoal.name,
       description: newGoal.description || null,
       target_value: newGoal.target_value,
-      current_value: 0,
       unit: newGoal.unit,
       deadline: newGoal.deadline || null,
       category: newGoal.category,
-      status: 'active',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }
+    })
     
-    setGoals(prev => [...prev, goal])
-    setNewGoal({ name: '', description: '', target_value: 0, unit: '', deadline: '', category: 'personal' })
+    setNewGoal({ name: '', title: '', description: '', target_value: 0, unit: '', deadline: '', category: 'personal' })
     setShowAddModal(false)
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+      </div>
+    )
   }
 
   return (

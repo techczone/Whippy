@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -28,9 +28,26 @@ import { useTranslation } from '@/hooks/use-translation'
 
 export function Sidebar() {
   const pathname = usePathname()
-  const { sidebarOpen, setSidebarOpen, setLanguage, settings } = useAppStore()
+  const { sidebarOpen, setSidebarOpen, setLanguage } = useAppStore()
   const [mobileOpen, setMobileOpen] = useState(false)
   const { t, language } = useTranslation()
+
+  // Close mobile menu on route change
+  useEffect(() => {
+    setMobileOpen(false)
+  }, [pathname])
+
+  // Prevent body scroll when mobile menu is open
+  useEffect(() => {
+    if (mobileOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [mobileOpen])
 
   const NAV_ITEMS = [
     { label: t.nav.dashboard, href: '/dashboard', icon: LayoutDashboard },
@@ -51,6 +68,10 @@ export function Sidebar() {
   const toggleLanguage = () => {
     const newLang: Language = language === 'tr' ? 'en' : 'tr'
     setLanguage(newLang)
+  }
+
+  const handleNavClick = () => {
+    setMobileOpen(false)
   }
 
   return (
@@ -79,40 +100,32 @@ export function Sidebar() {
       </AnimatePresence>
 
       {/* Sidebar */}
-      <motion.aside
-        initial={false}
-        animate={{ 
-          width: sidebarOpen ? 256 : 80,
-          x: mobileOpen ? 0 : undefined
-        }}
+      <aside
         className={cn(
           'fixed top-0 left-0 h-full bg-card border-r border-border z-40',
-          'flex flex-col transition-all duration-300',
+          'flex flex-col transition-all duration-300 ease-in-out',
+          // Desktop
           'md:relative md:translate-x-0',
-          mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+          sidebarOpen ? 'md:w-64' : 'md:w-20',
+          // Mobile
+          mobileOpen ? 'translate-x-0 w-64' : '-translate-x-full w-64'
         )}
       >
         {/* Logo */}
         <div className="p-4 border-b border-border">
-          <Link href="/dashboard" className="flex items-center" onClick={() => setMobileOpen(false)}>
+          <Link href="/dashboard" className="flex items-center" onClick={handleNavClick}>
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center shadow-lg shadow-orange-500/30 shrink-0">
+              <span className="text-lg">🔥</span>
+            </div>
             <AnimatePresence>
-              {sidebarOpen ? (
-                <motion.h1
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="text-2xl font-bold bg-gradient-to-r from-orange-400 to-red-500 bg-clip-text text-transparent"
+              {(sidebarOpen || mobileOpen) && (
+                <motion.span
+                  initial={{ opacity: 0, width: 0 }}
+                  animate={{ opacity: 1, width: 'auto' }}
+                  exit={{ opacity: 0, width: 0 }}
+                  className="ml-3 text-xl font-bold bg-gradient-to-r from-orange-400 to-red-500 bg-clip-text text-transparent whitespace-nowrap overflow-hidden"
                 >
                   Whippy
-                </motion.h1>
-              ) : (
-                <motion.span
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="text-2xl font-bold bg-gradient-to-r from-orange-400 to-red-500 bg-clip-text text-transparent"
-                >
-                  W
                 </motion.span>
               )}
             </AnimatePresence>
@@ -126,7 +139,7 @@ export function Sidebar() {
             const Icon = item.icon
 
             return (
-              <Link key={item.href} href={item.href} onClick={() => setMobileOpen(false)}>
+              <Link key={item.href} href={item.href} onClick={handleNavClick}>
                 <motion.div
                   className={cn(
                     'flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all',
@@ -139,7 +152,7 @@ export function Sidebar() {
                 >
                   <Icon className="w-5 h-5 shrink-0" />
                   <AnimatePresence>
-                    {sidebarOpen && (
+                    {(sidebarOpen || mobileOpen) && (
                       <motion.span
                         initial={{ opacity: 0, width: 0 }}
                         animate={{ opacity: 1, width: 'auto' }}
@@ -164,7 +177,7 @@ export function Sidebar() {
             const Icon = item.icon
 
             return (
-              <Link key={item.href} href={item.href} onClick={() => setMobileOpen(false)}>
+              <Link key={item.href} href={item.href} onClick={handleNavClick}>
                 <motion.div
                   className={cn(
                     'flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all',
@@ -177,7 +190,7 @@ export function Sidebar() {
                 >
                   <Icon className="w-5 h-5 shrink-0" />
                   <AnimatePresence>
-                    {sidebarOpen && (
+                    {(sidebarOpen || mobileOpen) && (
                       <motion.span
                         initial={{ opacity: 0, width: 0 }}
                         animate={{ opacity: 1, width: 'auto' }}
@@ -205,7 +218,7 @@ export function Sidebar() {
           >
             <Globe className="w-5 h-5 shrink-0" />
             <AnimatePresence>
-              {sidebarOpen && (
+              {(sidebarOpen || mobileOpen) && (
                 <motion.div
                   initial={{ opacity: 0, width: 0 }}
                   animate={{ opacity: 1, width: 'auto' }}
@@ -218,15 +231,10 @@ export function Sidebar() {
                 </motion.div>
               )}
             </AnimatePresence>
-            {!sidebarOpen && (
-              <span className="absolute -top-1 -right-1 text-[10px] font-bold bg-primary text-primary-foreground rounded px-1">
-                {language.toUpperCase()}
-              </span>
-            )}
           </motion.button>
         </div>
 
-        {/* Toggle button (desktop) */}
+        {/* Toggle button (desktop only) */}
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
           className={cn(
@@ -241,16 +249,15 @@ export function Sidebar() {
             <ChevronRight className="w-4 h-4" />
           )}
         </button>
-      </motion.aside>
+      </aside>
     </>
   )
 }
 
-// Mobile bottom navigation with language toggle
+// Mobile bottom navigation (without language toggle - it's in sidebar now)
 export function MobileBottomNav() {
   const pathname = usePathname()
-  const { t, language } = useTranslation()
-  const { setLanguage } = useAppStore()
+  const { t } = useTranslation()
 
   const mobileItems = [
     { label: t.nav.dashboard, href: '/dashboard', icon: LayoutDashboard },
@@ -259,11 +266,6 @@ export function MobileBottomNav() {
     { label: t.nav.coach, href: '/coach', icon: Sparkles },
     { label: t.nav.profile, href: '/profile', icon: User },
   ]
-
-  const toggleLanguage = () => {
-    const newLang: Language = language === 'tr' ? 'en' : 'tr'
-    setLanguage(newLang)
-  }
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border md:hidden z-40">
@@ -286,39 +288,7 @@ export function MobileBottomNav() {
             </Link>
           )
         })}
-        
-        {/* Language toggle button */}
-        <button
-          onClick={toggleLanguage}
-          className="flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors text-muted-foreground"
-        >
-          <div className="w-5 h-5 rounded-full border-2 border-current flex items-center justify-center text-[8px] font-bold">
-            {language.toUpperCase()}
-          </div>
-          <span className="text-[10px] font-medium">{language === 'tr' ? 'EN' : 'TR'}</span>
-        </button>
       </div>
     </nav>
-  )
-}
-
-// Desktop header language toggle (optional, for use in top bar)
-export function LanguageToggle() {
-  const { language } = useTranslation()
-  const { setLanguage } = useAppStore()
-
-  const toggleLanguage = () => {
-    const newLang: Language = language === 'tr' ? 'en' : 'tr'
-    setLanguage(newLang)
-  }
-
-  return (
-    <button
-      onClick={toggleLanguage}
-      className="flex items-center gap-1 px-2 py-1 rounded-lg bg-secondary hover:bg-accent transition-colors"
-    >
-      <Globe className="w-4 h-4" />
-      <span className="text-sm font-medium">{language.toUpperCase()}</span>
-    </button>
   )
 }

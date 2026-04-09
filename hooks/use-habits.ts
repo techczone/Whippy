@@ -1,11 +1,9 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Habit, HabitLog } from '@/types'
 import toast from 'react-hot-toast'
-
-const supabase = createClient()
 
 // ============================================
 // HABITS HOOK
@@ -15,6 +13,8 @@ export function useHabits(userId: string | undefined) {
   const [habits, setHabits] = useState<Habit[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
+  
+  const supabase = useMemo(() => createClient(), [])
 
   // Fetch habits
   const fetchHabits = useCallback(async () => {
@@ -41,7 +41,7 @@ export function useHabits(userId: string | undefined) {
     } finally {
       setLoading(false)
     }
-  }, [userId])
+  }, [userId, supabase])
 
   useEffect(() => {
     fetchHabits()
@@ -132,7 +132,8 @@ export function useHabits(userId: string | undefined) {
 export function useHabitLogs(userId: string | undefined, date?: string) {
   const [logs, setLogs] = useState<HabitLog[]>([])
   const [loading, setLoading] = useState(true)
-
+  
+  const supabase = useMemo(() => createClient(), [])
   const today = date || new Date().toISOString().split('T')[0]
 
   // Fetch logs for today
@@ -158,7 +159,7 @@ export function useHabitLogs(userId: string | undefined, date?: string) {
     } finally {
       setLoading(false)
     }
-  }, [userId, today])
+  }, [userId, today, supabase])
 
   useEffect(() => {
     fetchLogs()
@@ -169,6 +170,27 @@ export function useHabitLogs(userId: string | undefined, date?: string) {
     if (!userId) return
 
     const existingLog = logs.find(l => l.habit_id === habitId)
+
+    // Optimistic update - UI'ı hemen güncelle
+    if (existingLog) {
+      setLogs(prev => prev.map(l => 
+        l.id === existingLog.id 
+          ? { ...l, completed: !l.completed, completed_at: !l.completed ? new Date().toISOString() : null }
+          : l
+      ))
+    } else {
+      // Yeni log için geçici ID ile ekle
+      const tempLog: HabitLog = {
+        id: `temp-${Date.now()}`,
+        habit_id: habitId,
+        user_id: userId,
+        date: today,
+        completed: true,
+        completed_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+      }
+      setLogs(prev => [...prev, tempLog])
+    }
 
     try {
       if (existingLog) {
@@ -185,6 +207,7 @@ export function useHabitLogs(userId: string | undefined, date?: string) {
 
         if (error) throw error
         
+        // Gerçek data ile güncelle
         setLogs(prev => prev.map(l => l.id === existingLog.id ? data : l))
         
         if (data.completed) {
@@ -206,12 +229,17 @@ export function useHabitLogs(userId: string | undefined, date?: string) {
 
         if (error) throw error
         
-        setLogs(prev => [...prev, data])
+        // Temp log'u gerçek data ile değiştir
+        setLogs(prev => prev.map(l => 
+          l.id.startsWith('temp-') && l.habit_id === habitId ? data : l
+        ))
         toast.success('Tebrikler! 🎉')
       }
     } catch (err) {
       console.error('Error toggling habit:', err)
       toast.error('Bir hata oluştu')
+      // Hata durumunda geri al
+      fetchLogs()
     }
   }
 
@@ -238,10 +266,12 @@ export function useHabitsWithStatus(userId: string | undefined) {
   const { habits, loading: habitsLoading, addHabit, updateHabit, deleteHabit } = useHabits(userId)
   const { logs, loading: logsLoading, toggleHabit, isCompleted } = useHabitLogs(userId)
 
-  const habitsWithStatus = habits.map(habit => ({
-    ...habit,
-    completedToday: isCompleted(habit.id),
-  }))
+  const habitsWithStatus = useMemo(() => {
+    return habits.map(habit => ({
+      ...habit,
+      completedToday: isCompleted(habit.id),
+    }))
+  }, [habits, logs]) // logs değişince yeniden hesapla
 
   const completedCount = habitsWithStatus.filter(h => h.completedToday).length
   const totalCount = habitsWithStatus.length

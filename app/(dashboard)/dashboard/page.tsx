@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { 
   Plus, 
@@ -16,169 +16,64 @@ import { cn, formatDate, getWeekDays } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { StatCard } from '@/components/dashboard/stat-card'
+import { HabitCard } from '@/components/habits/habit-card'
 import { MoodSelector, MoodWeekView } from '@/components/mood/mood-selector'
+import { HealthSummaryCard } from '@/components/health/health-tracker'
 import { GoalCard } from '@/components/goals/goal-card'
+import { WeeklyChart } from '@/components/charts/weekly-chart'
 import { useAppStore } from '@/lib/store'
-import { useHabitsWithStatus } from '@/hooks/use-habits'
+import { useTranslation } from '@/hooks/use-translation'
 import { useAuth } from '@/hooks/use-auth'
-import { createClient } from '@/lib/supabase/client'
-import type { Habit, Goal, MoodEntry, HealthEntry } from '@/types'
-import confetti from 'canvas-confetti'
+import { useHabits } from '@/hooks/use-habits'
+import { useGoals } from '@/hooks/use-goals'
+import { useMoods } from '@/hooks/use-moods'
+import { useHealth } from '@/hooks/use-health'
+import type { HealthEntry } from '@/types'
 
 export default function DashboardPage() {
+  const { t, language } = useTranslation()
   const { user } = useAuth()
-  const userId = user?.id
-
-  // Real data from Supabase
-  const { habits, completedCount, totalCount, toggleHabit, addHabit } = useHabitsWithStatus(userId)
+  const { habits, toggleHabit, todayLogs } = useHabits()
+  const { goals } = useGoals()
+  const { moods, addMood, todayMood } = useMoods()
+  const { todayHealth } = useHealth()
   
-  const [goals, setGoals] = useState<Goal[]>([])
-  const [moods, setMoods] = useState<MoodEntry[]>([])
-  const [health, setHealth] = useState<Partial<HealthEntry>>({})
-  const [todayMood, setTodayMood] = useState<1 | 2 | 3 | 4 | 5 | undefined>(undefined)
-  const [loading, setLoading] = useState(true)
+  const [selectedMood, setSelectedMood] = useState<1 | 2 | 3 | 4 | 5 | undefined>(
+    todayMood?.value as 1 | 2 | 3 | 4 | 5 | undefined
+  )
 
   const today = new Date()
-  const todayStr = today.toISOString().split('T')[0]
-  const greeting = getGreeting()
-
-  // Fetch goals, moods, health from Supabase
-  useEffect(() => {
-    if (!userId) {
-      setLoading(false)
-      return
-    }
-
-    const fetchData = async () => {
-      const supabase = createClient()
-      
-      try {
-        // Fetch goals
-        const { data: goalsData } = await supabase
-          .from('goals')
-          .select('*')
-          .eq('user_id', userId)
-          .eq('status', 'active')
-          .limit(3)
-
-        if (goalsData) setGoals(goalsData)
-
-        // Fetch this week's moods
-        const weekStart = getWeekDays()[0].toISOString().split('T')[0]
-        const { data: moodsData } = await supabase
-          .from('mood_entries')
-          .select('*')
-          .eq('user_id', userId)
-          .gte('date', weekStart)
-          .order('date', { ascending: true })
-
-        if (moodsData) {
-          setMoods(moodsData)
-          const todayMoodEntry = moodsData.find(m => m.date === todayStr)
-          if (todayMoodEntry) {
-            setTodayMood(todayMoodEntry.value as 1 | 2 | 3 | 4 | 5)
-          }
-        }
-
-        // Fetch today's health entry
-        const { data: healthData } = await supabase
-          .from('health_entries')
-          .select('*')
-          .eq('user_id', userId)
-          .eq('date', todayStr)
-          .single()
-
-        if (healthData) setHealth(healthData)
-
-      } catch (err) {
-        console.error('Error fetching dashboard data:', err)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchData()
-  }, [userId, todayStr])
+  const greeting = getGreeting(language)
 
   // Calculate scores
-  const productivityScore = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
-  const healthScore = calculateHealthScore(health)
-  const moodScore = todayMood ? todayMood * 20 : 60
+  const completedHabits = todayLogs.length
+  const totalHabits = habits.filter(h => !h.archived).length
+  const productivityScore = totalHabits > 0 ? Math.round((completedHabits / totalHabits) * 100) : 0
+  const healthScore = calculateHealthScore(todayHealth)
+  const moodScore = selectedMood ? selectedMood * 20 : 60
   const overallScore = Math.round((productivityScore + healthScore + moodScore) / 3)
 
-  // Handle habit toggle with confetti
-  const handleHabitToggle = async (habitId: string, isCompleted: boolean) => {
-    if (!isCompleted) {
-      confetti({
-        particleCount: 100,
-        spread: 70,
-        origin: { y: 0.6 }
-      })
-    }
-    await toggleHabit(habitId)
+  const handleHabitToggle = async (id: string) => {
+    await toggleHabit(id)
   }
 
-  // Handle mood change
   const handleMoodChange = async (mood: 1 | 2 | 3 | 4 | 5) => {
-    if (!userId) return
-    
-    setTodayMood(mood)
-    
-    const supabase = createClient()
-    
-    try {
-      // Check if mood entry exists for today
-      const { data: existing } = await supabase
-        .from('mood_entries')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('date', todayStr)
-        .single()
-
-      if (existing) {
-        // Update existing
-        await supabase
-          .from('mood_entries')
-          .update({ value: mood })
-          .eq('id', existing.id)
-      } else {
-        // Create new
-        await supabase
-          .from('mood_entries')
-          .insert({
-            user_id: userId,
-            date: todayStr,
-            value: mood,
-          })
-      }
-
-      // Update local state
-      setMoods(prev => {
-        const filtered = prev.filter(m => m.date !== todayStr)
-        return [...filtered, { 
-          id: existing?.id || Date.now().toString(), 
-          user_id: userId, 
-          date: todayStr, 
-          value: mood, 
-          note: null, 
-          tags: [], 
-          energy_level: null, 
-          stress_level: null, 
-          created_at: new Date().toISOString() 
-        }]
-      })
-    } catch (err) {
-      console.error('Error saving mood:', err)
-    }
+    setSelectedMood(mood)
+    await addMood(mood)
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
-      </div>
-    )
-  }
+  // Weekly data for chart
+  const weeklyData = useMemo(() => {
+    return getWeekDays().map((date) => ({
+      date: date.toISOString().split('T')[0],
+      productivity: 60 + Math.random() * 30,
+      health: 50 + Math.random() * 40,
+      mood: 40 + Math.random() * 50,
+    }))
+  }, [])
+
+  const activeHabits = habits.filter(h => !h.archived)
+  const activeGoals = goals.filter(g => g.status === 'active')
 
   return (
     <div className="space-y-6">
@@ -187,20 +82,20 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-2xl md:text-3xl font-bold">{greeting}</h1>
           <p className="text-muted-foreground">
-            {formatDate(today, 'EEEE, d MMMM yyyy')}
+            {formatDate(today, language === 'tr' ? 'EEEE, d MMMM yyyy' : 'EEEE, MMMM d, yyyy')}
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" asChild>
             <Link href="/reports">
               <TrendingUp className="w-4 h-4 mr-2" />
-              Raporlar
+              {t.dashboard.reports}
             </Link>
           </Button>
           <Button asChild>
             <Link href="/coach">
               <Sparkles className="w-4 h-4 mr-2" />
-              AI Koç
+              {t.dashboard.ai_coach}
             </Link>
           </Button>
         </div>
@@ -209,235 +104,174 @@ export default function DashboardPage() {
       {/* Score cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard
-          title="Genel Skor"
+          title={t.dashboard.overall_score}
           value={overallScore}
           icon="🎯"
           change={5}
-          changeLabel="vs dün"
+          changeLabel={t.dashboard.vs_yesterday}
           variant="circular"
         />
         <StatCard
-          title="Verimlilik"
+          title={t.dashboard.productivity}
           value={productivityScore}
           icon="⚡"
-          subtitle={`${completedCount}/${totalCount} alışkanlık`}
+          subtitle={`${completedHabits}/${totalHabits} ${t.dashboard.habits_completed}`}
         />
         <StatCard
-          title="Sağlık"
+          title={t.dashboard.health}
           value={healthScore}
           icon="❤️"
           change={-3}
-          changeLabel="vs dün"
+          changeLabel={t.dashboard.vs_yesterday}
         />
         <StatCard
-          title="Ruh Hali"
+          title={t.dashboard.mood}
           value={moodScore}
           icon="😊"
           change={10}
-          changeLabel="vs dün"
+          changeLabel={t.dashboard.vs_yesterday}
         />
       </div>
 
       {/* Main content grid */}
-      <div className="grid lg:grid-cols-3 gap-6">
-        {/* Left column - Habits */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left column - Habits & Chart */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Today's Habits */}
+          {/* Habits section */}
           <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <Target className="w-5 h-5 text-primary" />
-                  Bugünkü Alışkanlıklar
-                </CardTitle>
-                <Link href="/habits" className="text-sm text-muted-foreground hover:text-primary flex items-center">
-                  Tümü <ChevronRight className="w-4 h-4" />
-                </Link>
-              </div>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="flex items-center gap-2">
+                <Target className="w-5 h-5 text-primary" />
+                {t.dashboard.todays_habits}
+              </CardTitle>
+              <Link href="/habits">
+                <Button variant="ghost" size="sm">
+                  {t.dashboard.view_all} <ChevronRight className="w-4 h-4 ml-1" />
+                </Button>
+              </Link>
             </CardHeader>
             <CardContent className="space-y-3">
-              {habits.length === 0 ? (
+              {activeHabits.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
-                  <Target className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                  <p>Henüz alışkanlık eklemedin</p>
-                  <Button variant="outline" size="sm" className="mt-3" asChild>
-                    <Link href="/habits">
-                      <Plus className="w-4 h-4 mr-2" />
-                      Alışkanlık Ekle
-                    </Link>
-                  </Button>
+                  <p>{t.dashboard.no_habits_yet}</p>
+                  <p className="text-sm">{t.dashboard.create_first_habit}</p>
                 </div>
               ) : (
-                habits.slice(0, 4).map((habit) => (
-                  <motion.div
-                    key={habit.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className={cn(
-                      'flex items-center gap-4 p-3 rounded-xl border transition-all',
-                      habit.completedToday 
-                        ? 'bg-green-500/10 border-green-500/30' 
-                        : 'hover:bg-accent/50'
-                    )}
-                  >
-                    <button
-                      onClick={() => handleHabitToggle(habit.id, habit.completedToday)}
-                      className={cn(
-                        'w-8 h-8 rounded-lg border-2 flex items-center justify-center transition-all shrink-0',
-                        habit.completedToday 
-                          ? 'bg-green-500 border-green-500 text-white' 
-                          : 'border-muted-foreground/30 hover:border-primary'
-                      )}
-                    >
-                      {habit.completedToday && <span className="text-sm">✓</span>}
-                    </button>
-                    <div 
-                      className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0"
-                      style={{ backgroundColor: `${habit.color}20` }}
-                    >
-                      {habit.icon}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h4 className={cn(
-                        'font-medium truncate',
-                        habit.completedToday && 'line-through text-muted-foreground'
-                      )}>
-                        {habit.name}
-                      </h4>
-                      {habit.streak > 0 && (
-                        <span className="inline-flex items-center gap-1 text-xs text-orange-500">
-                          <Flame className="w-3 h-3" />
-                          {habit.streak} gün seri
-                        </span>
-                      )}
-                    </div>
-                  </motion.div>
-                ))
+                activeHabits.slice(0, 4).map((habit) => {
+                  const isCompleted = todayLogs.some(log => log.habit_id === habit.id)
+                  return (
+                    <HabitCard
+                      key={habit.id}
+                      id={habit.id}
+                      name={habit.name}
+                      icon={habit.icon}
+                      color={habit.color}
+                      streak={habit.streak}
+                      completed={isCompleted}
+                      onToggle={handleHabitToggle}
+                    />
+                  )
+                })
               )}
-              
-              {/* Add habit inline */}
-              <Link 
-                href="/habits"
-                className="flex items-center justify-center gap-2 p-3 rounded-xl border border-dashed border-muted-foreground/30 text-muted-foreground hover:text-foreground hover:border-primary transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-                Yeni Alışkanlık Ekle
-              </Link>
+              <Button variant="outline" className="w-full mt-2" asChild>
+                <Link href="/habits">
+                  <Plus className="w-4 h-4 mr-2" />
+                  {t.dashboard.add_habit}
+                </Link>
+              </Button>
             </CardContent>
           </Card>
 
-          {/* Goals Summary */}
+          {/* Weekly chart */}
           <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5 text-primary" />
-                  Hedefler
-                </CardTitle>
-                <Link href="/goals" className="text-sm text-muted-foreground hover:text-primary flex items-center">
-                  Tümü <ChevronRight className="w-4 h-4" />
-                </Link>
-              </div>
+            <CardHeader>
+              <CardTitle>{t.dashboard.weekly_performance}</CardTitle>
             </CardHeader>
             <CardContent>
-              {goals.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <TrendingUp className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                  <p>Henüz hedef eklemedin</p>
-                  <Button variant="outline" size="sm" className="mt-3" asChild>
-                    <Link href="/goals">
-                      <Plus className="w-4 h-4 mr-2" />
-                      Hedef Ekle
-                    </Link>
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {goals.map((goal) => (
-                    <GoalCard key={goal.id} goal={goal} compact />
-                  ))}
-                </div>
-              )}
+              <WeeklyChart data={weeklyData} />
             </CardContent>
           </Card>
         </div>
 
-        {/* Right column - Mood & Health */}
+        {/* Right column - Mood, Health, Goals */}
         <div className="space-y-6">
-          {/* Mood */}
+          {/* Mood section */}
           <Card>
-            <CardHeader className="pb-3">
-              <CardTitle>Bugün Nasıl Hissediyorsun?</CardTitle>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">{t.dashboard.how_feeling}</CardTitle>
             </CardHeader>
-            <CardContent>
-              <MoodSelector 
-                value={todayMood} 
+            <CardContent className="space-y-4">
+              <MoodSelector
+                value={selectedMood}
                 onChange={handleMoodChange}
+                showLabels
+                size="lg"
               />
-              <div className="mt-4">
-                <p className="text-sm text-muted-foreground mb-2">Bu hafta</p>
-                <MoodWeekView moods={moods} />
+              <div className="pt-2 border-t border-border">
+                <p className="text-sm text-muted-foreground mb-2">{t.dashboard.this_week}</p>
+                <MoodWeekView moods={moods.slice(-7).map(m => ({ date: m.date, value: m.value }))} />
               </div>
             </CardContent>
           </Card>
 
-          {/* Health Summary */}
+          {/* Health section */}
+          <HealthSummaryCard data={todayHealth || {}} />
+
+          {/* Goals section */}
           <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5 text-primary" />
-                  Sağlık Skoru
-                </CardTitle>
-              </div>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <TrendingUp className="w-5 h-5 text-primary" />
+                {t.goals.title}
+              </CardTitle>
+              <Link href="/goals">
+                <Button variant="ghost" size="sm">
+                  {t.dashboard.view_all} <ChevronRight className="w-4 h-4 ml-1" />
+                </Button>
+              </Link>
             </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-4">
-                <div className="relative">
-                  <svg className="w-20 h-20 -rotate-90">
-                    <circle
-                      className="stroke-muted"
-                      strokeWidth="6"
-                      fill="transparent"
-                      r="32"
-                      cx="40"
-                      cy="40"
-                    />
-                    <circle
-                      className="stroke-primary transition-all duration-500"
-                      strokeWidth="6"
-                      strokeLinecap="round"
-                      fill="transparent"
-                      r="32"
-                      cx="40"
-                      cy="40"
-                      style={{
-                        strokeDasharray: `${2 * Math.PI * 32}`,
-                        strokeDashoffset: `${2 * Math.PI * 32 * (1 - healthScore / 100)}`,
-                      }}
-                    />
-                  </svg>
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-xl font-bold">{healthScore}</span>
-                  </div>
+            <CardContent className="space-y-3">
+              {activeGoals.length === 0 ? (
+                <p className="text-center py-4 text-muted-foreground text-sm">
+                  {t.goals.no_goals}
+                </p>
+              ) : (
+                activeGoals.slice(0, 2).map((goal) => (
+                  <GoalCard key={goal.id} goal={goal} compact />
+                ))
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Streak highlights */}
+          <Card className="bg-gradient-to-br from-orange-500/10 to-amber-500/10 border-orange-500/30">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 rounded-xl bg-orange-500/20 flex items-center justify-center">
+                  <Flame className="w-6 h-6 text-orange-500" />
                 </div>
-                <div className="flex-1 space-y-2 text-sm">
-                  <div className="flex items-center gap-2">
-                    <span className="text-blue-400">💧</span>
-                    <span className="text-muted-foreground">Su:</span>
-                    <span className="font-medium">{health?.water_liters || 0} L</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-purple-400">🌙</span>
-                    <span className="text-muted-foreground">Uyku:</span>
-                    <span className="font-medium">{health?.sleep_hours || 0} sa</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-green-400">💪</span>
-                    <span className="text-muted-foreground">Egzersiz:</span>
-                    <span className="font-medium">{health?.exercise_minutes || 0} dk</span>
-                  </div>
+                <div>
+                  <h3 className="font-semibold">{t.habits.best_streak}</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {language === 'tr' ? 'Devam ettir!' : 'Keep it up!'}
+                  </p>
                 </div>
+              </div>
+              <div className="space-y-2">
+                {activeHabits
+                  .sort((a, b) => b.streak - a.streak)
+                  .slice(0, 3)
+                  .map((habit) => (
+                    <div key={habit.id} className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span>{habit.icon}</span>
+                        <span className="text-sm">{habit.name}</span>
+                      </div>
+                      <span className="streak-badge">
+                        {habit.streak} {t.habits.days}
+                      </span>
+                    </div>
+                  ))}
               </div>
             </CardContent>
           </Card>
@@ -447,32 +281,39 @@ export default function DashboardPage() {
   )
 }
 
-// Helper functions
-function getGreeting() {
+function getGreeting(lang: string): string {
   const hour = new Date().getHours()
-  if (hour < 12) return 'Günaydın 👋'
-  if (hour < 18) return 'İyi Günler 👋'
-  return 'İyi Akşamlar 👋'
+  if (lang === 'tr') {
+    if (hour < 6) return 'İyi Geceler 🌙'
+    if (hour < 12) return 'Günaydın ☀️'
+    if (hour < 18) return 'İyi Günler 👋'
+    return 'İyi Akşamlar 🌆'
+  } else {
+    if (hour < 6) return 'Good Night 🌙'
+    if (hour < 12) return 'Good Morning ☀️'
+    if (hour < 18) return 'Good Afternoon 👋'
+    return 'Good Evening 🌆'
+  }
 }
 
-function calculateHealthScore(health: Partial<HealthEntry> | null | undefined) {
-  if (!health) return 50 // Default score if no health data
+function calculateHealthScore(health: Partial<HealthEntry> | null): number {
+  if (!health) return 0
   
-  let score = 50 // Base score
-  
+  let score = 0
+  let count = 0
+
   if (health.water_liters) {
-    score += Math.min(health.water_liters / 2.5, 1) * 15
+    score += Math.min(100, (health.water_liters / 2.5) * 100)
+    count++
   }
   if (health.sleep_hours) {
-    const sleepScore = health.sleep_hours >= 7 && health.sleep_hours <= 9 ? 1 : 0.5
-    score += sleepScore * 15
+    score += Math.min(100, (health.sleep_hours / 8) * 100)
+    count++
   }
   if (health.exercise_minutes) {
-    score += Math.min(health.exercise_minutes / 30, 1) * 10
-  }
-  if (health.steps) {
-    score += Math.min(health.steps / 10000, 1) * 10
+    score += Math.min(100, (health.exercise_minutes / 60) * 100)
+    count++
   }
 
-  return Math.min(Math.round(score), 100)
+  return count > 0 ? Math.round(score / count) : 0
 }

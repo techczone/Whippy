@@ -17,13 +17,16 @@ import { Input } from '@/components/ui/input'
 import { Progress } from '@/components/ui/progress'
 import { cn } from '@/lib/utils'
 import { useHabitsWithStatus } from '@/hooks/use-habits'
+import { useTranslation } from '@/hooks/use-translation'
 import { createClient } from '@/lib/supabase/client'
 import confetti from 'canvas-confetti'
+import toast from 'react-hot-toast'
 
 const HABIT_ICONS = ['🏃', '💪', '📚', '🧘', '💧', '🥗', '😴', '📝', '🎯', '💼', '🎨', '🎵']
 const HABIT_COLORS = ['#8B5CF6', '#14B8A6', '#F97316', '#EC4899', '#3B82F6', '#22C55E', '#EAB308', '#EF4444']
 
 export default function HabitsPage() {
+  const { t, language } = useTranslation()
   const [userId, setUserId] = useState<string | undefined>()
   const [showAddModal, setShowAddModal] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -60,6 +63,7 @@ export default function HabitsPage() {
         spread: 70,
         origin: { y: 0.6 }
       })
+      toast.success(t.habits.habit_completed)
     }
     await toggleHabit(habitId)
   }
@@ -81,12 +85,12 @@ export default function HabitsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Alışkanlıklar</h1>
-          <p className="text-muted-foreground">Günlük rutinlerini takip et</p>
+          <h1 className="text-2xl font-bold">{t.habits.title}</h1>
+          <p className="text-muted-foreground">{t.habits.subtitle}</p>
         </div>
         <Button onClick={() => setShowAddModal(true)} className="gap-2">
           <Plus className="w-4 h-4" />
-          Yeni Alışkanlık
+          {t.habits.add_new}
         </Button>
       </div>
 
@@ -100,7 +104,9 @@ export default function HabitsPage() {
               </div>
               <div>
                 <p className="text-2xl font-bold">{completionRate}%</p>
-                <p className="text-xs text-muted-foreground">Bugün tamamlanan</p>
+                <p className="text-xs text-muted-foreground">
+                  {language === 'tr' ? 'Bugün tamamlanan' : 'Completed today'}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -114,7 +120,9 @@ export default function HabitsPage() {
               </div>
               <div>
                 <p className="text-2xl font-bold">{totalStreak}</p>
-                <p className="text-xs text-muted-foreground">Toplam seri günü</p>
+                <p className="text-xs text-muted-foreground">
+                  {language === 'tr' ? 'Toplam seri günü' : 'Total streak days'}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -128,7 +136,7 @@ export default function HabitsPage() {
               </div>
               <div>
                 <p className="text-2xl font-bold">{bestStreak || 0}</p>
-                <p className="text-xs text-muted-foreground">En uzun seri</p>
+                <p className="text-xs text-muted-foreground">{t.habits.best_streak}</p>
               </div>
             </div>
           </CardContent>
@@ -142,7 +150,7 @@ export default function HabitsPage() {
               </div>
               <div>
                 <p className="text-2xl font-bold">{completedCount}/{totalCount}</p>
-                <p className="text-xs text-muted-foreground">Bugün</p>
+                <p className="text-xs text-muted-foreground">{t.today}</p>
               </div>
             </div>
           </CardContent>
@@ -153,7 +161,9 @@ export default function HabitsPage() {
       <Card>
         <CardContent className="pt-4">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium">Bugünkü İlerleme</span>
+            <span className="text-sm font-medium">
+              {language === 'tr' ? 'Bugünkü İlerleme' : "Today's Progress"}
+            </span>
             <span className="text-sm text-muted-foreground">{completedCount}/{totalCount}</span>
           </div>
           <Progress value={completionRate} className="h-3" />
@@ -164,7 +174,7 @@ export default function HabitsPage() {
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input
-          placeholder="Alışkanlık ara..."
+          placeholder={language === 'tr' ? 'Alışkanlık ara...' : 'Search habits...'}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="pl-10"
@@ -178,13 +188,13 @@ export default function HabitsPage() {
             <Card>
               <CardContent className="py-12 text-center">
                 <Target className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                <h3 className="font-medium mb-2">Henüz alışkanlık yok</h3>
+                <h3 className="font-medium mb-2">{t.habits.no_habits}</h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  İlk alışkanlığını ekleyerek başla
+                  {t.habits.create_first}
                 </p>
                 <Button onClick={() => setShowAddModal(true)}>
                   <Plus className="w-4 h-4 mr-2" />
-                  Alışkanlık Ekle
+                  {t.habits.add_new}
                 </Button>
               </CardContent>
             </Card>
@@ -199,34 +209,24 @@ export default function HabitsPage() {
               >
                 <Card 
                   className={cn(
-                    'transition-all cursor-pointer hover:shadow-md',
+                    'cursor-pointer transition-all hover:shadow-md',
                     habit.completedToday && 'bg-green-500/10 border-green-500/30'
                   )}
+                  onClick={() => handleToggle(habit.id, habit.completedToday)}
                 >
                   <CardContent className="py-4">
                     <div className="flex items-center gap-4">
-                      {/* Checkbox */}
-                      <button
-                        onClick={() => handleToggle(habit.id, habit.completedToday)}
-                        className={cn(
-                          'w-8 h-8 rounded-lg border-2 flex items-center justify-center transition-all',
-                          habit.completedToday 
-                            ? 'bg-green-500 border-green-500 text-white' 
-                            : 'border-muted-foreground/30 hover:border-primary'
-                        )}
-                      >
-                        {habit.completedToday && <Check className="w-5 h-5" />}
-                      </button>
-
-                      {/* Icon */}
                       <div 
-                        className="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
-                        style={{ backgroundColor: `${habit.color}20` }}
+                        className={cn(
+                          'w-12 h-12 rounded-xl flex items-center justify-center text-xl transition-all',
+                          habit.completedToday ? 'bg-green-500 text-white' : 'bg-muted'
+                        )}
+                        style={{ 
+                          backgroundColor: habit.completedToday ? '#22C55E' : `${habit.color}20`,
+                        }}
                       >
-                        {habit.icon}
+                        {habit.completedToday ? <Check className="w-6 h-6" /> : habit.icon}
                       </div>
-
-                      {/* Info */}
                       <div className="flex-1">
                         <h3 className={cn(
                           'font-medium',
@@ -234,26 +234,31 @@ export default function HabitsPage() {
                         )}>
                           {habit.name}
                         </h3>
-                        {habit.streak > 0 && (
-                          <span className="inline-flex items-center gap-1 text-xs text-orange-500 mt-1">
-                            <Flame className="w-3 h-3" />
-                            {habit.streak} gün seri
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-xs text-muted-foreground flex items-center gap-1">
+                            <Flame className="w-3 h-3 text-orange-500" />
+                            {habit.streak} {t.habits.days} {t.habits.streak.toLowerCase()}
                           </span>
-                        )}
+                          <span className="text-xs text-muted-foreground">•</span>
+                          <span className="text-xs text-muted-foreground">
+                            {t.habits.best_streak}: {habit.best_streak}
+                          </span>
+                        </div>
                       </div>
-
-                      {/* Delete */}
-                      <button
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="shrink-0"
                         onClick={(e) => {
                           e.stopPropagation()
-                          if (confirm('Bu alışkanlığı silmek istediğine emin misin?')) {
+                          if (confirm(t.messages.delete_confirm)) {
                             deleteHabit(habit.id)
+                            toast.success(t.habits.habit_deleted)
                           }
                         }}
-                        className="p-2 text-muted-foreground hover:text-red-500 transition-colors"
                       >
                         <X className="w-4 h-4" />
-                      </button>
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
@@ -263,97 +268,97 @@ export default function HabitsPage() {
         </AnimatePresence>
       </div>
 
-      {/* Add Habit Button (Mobile) */}
-      <button
+      {/* Mobile FAB */}
+      <Button
         onClick={() => setShowAddModal(true)}
-        className="fixed bottom-24 right-4 md:hidden w-14 h-14 rounded-full bg-primary text-white shadow-lg flex items-center justify-center"
+        className="fixed bottom-24 right-4 w-14 h-14 rounded-full shadow-lg md:hidden z-30"
+        size="icon"
       >
         <Plus className="w-6 h-6" />
-      </button>
+      </Button>
 
       {/* Add Habit Modal */}
-      <AddHabitModal 
-        isOpen={showAddModal} 
-        onClose={() => setShowAddModal(false)}
-        onAdd={addHabit}
-      />
+      <AnimatePresence>
+        {showAddModal && (
+          <AddHabitModal
+            onClose={() => setShowAddModal(false)}
+            onAdd={async (habit) => {
+              await addHabit(habit)
+              toast.success(t.habits.habit_added)
+              setShowAddModal(false)
+            }}
+            t={t}
+            language={language}
+          />
+        )}
+      </AnimatePresence>
     </div>
   )
 }
 
-// Add Habit Modal Component
 function AddHabitModal({ 
-  isOpen, 
   onClose, 
-  onAdd 
+  onAdd,
+  t,
+  language 
 }: { 
-  isOpen: boolean
   onClose: () => void
-  onAdd: (habit: any) => Promise<any>
+  onAdd: (habit: { name: string; icon: string; color: string }) => void
+  t: any
+  language: string
 }) {
   const [name, setName] = useState('')
   const [icon, setIcon] = useState('🎯')
   const [color, setColor] = useState('#8B5CF6')
-  const [loading, setLoading] = useState(false)
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSubmit = () => {
     if (!name.trim()) return
-
-    setLoading(true)
-    await onAdd({
-      name: name.trim(),
-      icon,
-      color,
-      frequency: 'daily',
-      target_days: [0, 1, 2, 3, 4, 5, 6],
-    })
-    setLoading(false)
-    setName('')
-    setIcon('🎯')
-    setColor('#8B5CF6')
-    onClose()
+    onAdd({ name, icon, color })
   }
 
-  if (!isOpen) return null
-
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <>
       <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.95 }}
-        className="bg-card rounded-2xl p-6 w-full max-w-md border border-border"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 bg-black/50 z-50"
+        onClick={onClose}
+      />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        className="fixed inset-x-4 top-1/2 -translate-y-1/2 md:inset-auto md:left-1/2 md:-translate-x-1/2 md:w-full md:max-w-md bg-card rounded-2xl shadow-xl z-50 p-6"
       >
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold">Yeni Alışkanlık</h2>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+          <h2 className="text-xl font-bold">{t.habits.add_new}</h2>
+          <Button variant="ghost" size="icon" onClick={onClose}>
             <X className="w-5 h-5" />
-          </button>
+          </Button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-4">
           <div>
-            <label className="text-sm font-medium mb-2 block">Alışkanlık Adı</label>
+            <label className="text-sm font-medium mb-2 block">{t.habits.habit_name}</label>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Örn: 30 dk egzersiz"
+              placeholder={language === 'tr' ? 'örn: 30 dk egzersiz' : 'e.g., 30 min exercise'}
               autoFocus
             />
           </div>
 
           <div>
-            <label className="text-sm font-medium mb-2 block">İkon</label>
-            <div className="flex flex-wrap gap-2">
+            <label className="text-sm font-medium mb-2 block">{t.habits.select_icon}</label>
+            <div className="grid grid-cols-6 gap-2">
               {HABIT_ICONS.map((i) => (
                 <button
                   key={i}
-                  type="button"
                   onClick={() => setIcon(i)}
                   className={cn(
-                    'w-10 h-10 rounded-lg text-xl flex items-center justify-center transition-all',
-                    icon === i ? 'bg-primary/20 ring-2 ring-primary' : 'bg-secondary hover:bg-secondary/80'
+                    'w-10 h-10 rounded-lg flex items-center justify-center text-lg transition-all',
+                    icon === i ? 'bg-primary text-primary-foreground scale-110' : 'bg-muted hover:bg-accent'
                   )}
                 >
                   {i}
@@ -363,33 +368,32 @@ function AddHabitModal({
           </div>
 
           <div>
-            <label className="text-sm font-medium mb-2 block">Renk</label>
-            <div className="flex flex-wrap gap-2">
+            <label className="text-sm font-medium mb-2 block">{t.habits.select_color}</label>
+            <div className="grid grid-cols-8 gap-2">
               {HABIT_COLORS.map((c) => (
                 <button
                   key={c}
-                  type="button"
                   onClick={() => setColor(c)}
                   className={cn(
-                    'w-8 h-8 rounded-full transition-all',
-                    color === c && 'ring-2 ring-offset-2 ring-offset-background ring-white'
+                    'w-8 h-8 rounded-lg transition-all',
+                    color === c && 'ring-2 ring-offset-2 ring-primary scale-110'
                   )}
                   style={{ backgroundColor: c }}
                 />
               ))}
             </div>
           </div>
+        </div>
 
-          <div className="flex gap-3 pt-4">
-            <Button type="button" variant="outline" onClick={onClose} className="flex-1">
-              İptal
-            </Button>
-            <Button type="submit" disabled={!name.trim() || loading} className="flex-1">
-              {loading ? 'Ekleniyor...' : 'Ekle'}
-            </Button>
-          </div>
-        </form>
+        <div className="flex gap-3 mt-6">
+          <Button variant="outline" className="flex-1" onClick={onClose}>
+            {t.cancel}
+          </Button>
+          <Button className="flex-1" onClick={handleSubmit} disabled={!name.trim()}>
+            {t.add}
+          </Button>
+        </div>
       </motion.div>
-    </div>
+    </>
   )
 }

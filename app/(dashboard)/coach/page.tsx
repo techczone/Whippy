@@ -1,13 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { Sparkles, Info, Zap, History } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { AICoach, CoachQuickActions } from '@/components/coach/ai-coach'
+import { AICoach } from '@/components/coach/ai-coach'
 import { useAppStore } from '@/lib/store'
+import { useAuth } from '@/hooks/use-auth'
+import { createClient } from '@/lib/supabase/client'
 import type { CoachMode } from '@/types'
 
 const COACH_INFO = {
@@ -56,14 +58,145 @@ const QUICK_PROMPTS = [
 ]
 
 export default function CoachPage() {
+  const { user } = useAuth()
+  const userId = user?.id
+  
   const { coachMode, setCoachMode, coachMessages, clearCoachMessages } = useAppStore()
   const [showInfo, setShowInfo] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [stats, setStats] = useState({
+    habitScore: 0,
+    healthScore: 0,
+    moodScore: 60,
+    overallScore: 0,
+    completedHabits: 0,
+    totalHabits: 0,
+    exercise: 0,
+    sleep: 0,
+    water: 0,
+    goals: '',
+    projects: '',
+  })
 
+  const supabase = useMemo(() => createClient(), [])
   const currentCoachInfo = COACH_INFO[coachMode]
 
-  const handleQuickPrompt = (prompt: string) => {
-    // This would be handled by the AICoach component
-    // For now, we'll just show a toast or something
+  // Fetch user stats for AI context
+  useEffect(() => {
+    if (!userId) {
+      setLoading(false)
+      return
+    }
+
+    const fetchStats = async () => {
+      const today = new Date().toISOString().split('T')[0]
+      
+      try {
+        // Fetch habits
+        const { data: habits } = await supabase
+          .from('habits')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('archived', false)
+
+        const totalHabits = habits?.length || 0
+
+        // Fetch today's habit logs
+        const { data: todayLogs } = await supabase
+          .from('habit_logs')
+          .select('completed')
+          .eq('user_id', userId)
+          .eq('date', today)
+          .eq('completed', true)
+
+        const completedHabits = todayLogs?.length || 0
+        const habitScore = totalHabits > 0 ? Math.round((completedHabits / totalHabits) * 100) : 0
+
+        // Fetch today's health
+        const { data: health } = await supabase
+          .from('health_entries')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('date', today)
+          .single()
+
+        const exercise = health?.exercise_minutes || 0
+        const sleep = health?.sleep_hours || 0
+        const water = health?.water_liters || 0
+
+        // Calculate health score
+        const healthScore = Math.round(
+          (Math.min(water / 2.5, 1) * 25) +
+          (sleep >= 7 && sleep <= 9 ? 25 : Math.min(sleep / 8, 1) * 25) +
+          (Math.min(exercise / 30, 1) * 25) +
+          (habitScore / 100 * 25)
+        )
+
+        // Fetch today's mood
+        const { data: mood } = await supabase
+          .from('mood_entries')
+          .select('value')
+          .eq('user_id', userId)
+          .eq('date', today)
+          .single()
+
+        const moodScore = mood?.value ? mood.value * 20 : 60
+
+        // Fetch goals
+        const { data: goals } = await supabase
+          .from('goals')
+          .select('title, current_value, target_value, status')
+          .eq('user_id', userId)
+          .eq('status', 'active')
+          .limit(5)
+
+        const goalsText = goals?.map(g => 
+          `${g.title}: ${g.current_value}/${g.target_value}`
+        ).join(', ') || 'Henüz aktif hedef yok'
+
+        // Fetch projects
+        const { data: projects } = await supabase
+          .from('projects')
+          .select('name, progress, status')
+          .eq('user_id', userId)
+          .eq('status', 'active')
+          .limit(5)
+
+        const projectsText = projects?.map(p => 
+          `${p.name}: %${p.progress}`
+        ).join(', ') || 'Henüz aktif proje yok'
+
+        const overallScore = Math.round((habitScore + healthScore + moodScore) / 3)
+
+        setStats({
+          habitScore,
+          healthScore,
+          moodScore,
+          overallScore,
+          completedHabits,
+          totalHabits,
+          exercise,
+          sleep,
+          water,
+          goals: goalsText,
+          projects: projectsText,
+        })
+      } catch (err) {
+        console.error('Error fetching stats:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchStats()
+  }, [userId, supabase])
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+      </div>
+    )
   }
 
   return (
@@ -130,7 +263,10 @@ export default function CoachPage() {
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Chat interface */}
         <div className="lg:col-span-2">
-          <AICoach className="h-[calc(100vh-250px)] min-h-[500px]" />
+          <AICoach 
+            className="h-[calc(100vh-250px)] min-h-[500px]" 
+            stats={stats}
+          />
         </div>
 
         {/* Sidebar */}
@@ -146,6 +282,44 @@ export default function CoachPage() {
                 </div>
               </div>
               <p className="text-sm text-muted-foreground">{currentCoachInfo.description}</p>
+            </CardContent>
+          </Card>
+
+          {/* Current Stats */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">📊 Güncel Durum</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Alışkanlık</span>
+                <span className="font-medium">{stats.completedHabits}/{stats.totalHabits} ({stats.habitScore}%)</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Sağlık Skoru</span>
+                <span className="font-medium">{stats.healthScore}%</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Ruh Hali</span>
+                <span className="font-medium">{stats.moodScore}%</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Egzersiz</span>
+                <span className="font-medium">{stats.exercise} dk</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Uyku</span>
+                <span className="font-medium">{stats.sleep} saat</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Su</span>
+                <span className="font-medium">{stats.water} L</span>
+              </div>
+              <hr className="my-2" />
+              <div className="flex justify-between text-sm font-bold">
+                <span>Genel Skor</span>
+                <span className="text-primary">{stats.overallScore}%</span>
+              </div>
             </CardContent>
           </Card>
 
@@ -165,7 +339,6 @@ export default function CoachPage() {
                     variant="outline"
                     size="sm"
                     className="h-auto py-2 px-3 text-xs text-left justify-start"
-                    onClick={() => handleQuickPrompt(item.prompt)}
                   >
                     {item.label}
                   </Button>
@@ -190,7 +363,7 @@ export default function CoachPage() {
           {/* Stats */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-lg">📊 Sohbet İstatistikleri</CardTitle>
+              <CardTitle className="text-lg">💬 Sohbet İstatistikleri</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">

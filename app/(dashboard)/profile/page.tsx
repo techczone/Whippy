@@ -5,7 +5,6 @@ import { motion } from 'framer-motion'
 import { 
   User, 
   Mail, 
-  Camera,
   Trophy,
   Target,
   Flame,
@@ -14,226 +13,217 @@ import {
   Edit2,
   Save,
   X,
-  Heart
+  LogIn,
+  Heart,
+  Smile
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { Progress } from '@/components/ui/progress'
 import { useAuth } from '@/hooks/use-auth'
+import { useTranslation } from '@/hooks/use-translation'
 import { createClient } from '@/lib/supabase/client'
+import Link from 'next/link'
 import toast from 'react-hot-toast'
 
-// Tüm başarılar (achievements tablosundan çekilebilir ama statik de olabilir)
-const ALL_ACHIEVEMENTS = [
-  { id: 'first_habit', name: 'İlk Adım', icon: '🌟', description: 'İlk alışkanlığını tamamla', condition: (s: any) => s.totalHabitsCompleted >= 1 },
-  { id: 'streak_7', name: 'Tutarlı Başlangıç', icon: '🔥', description: '7 günlük seri', condition: (s: any) => s.currentStreak >= 7 },
-  { id: 'water_master', name: 'Su Canavarı', icon: '💧', description: '7 gün üst üste 2.5L su iç', condition: (s: any) => s.waterStreak >= 7 },
-  { id: 'streak_30', name: 'Alışkanlık Ustası', icon: '⚡', description: '30 günlük seri', condition: (s: any) => s.currentStreak >= 30 },
-  { id: 'first_goal', name: 'Hedef Avcısı', icon: '🎯', description: 'İlk hedefini tamamla', condition: (s: any) => s.goalsCompleted >= 1 },
-  { id: 'streak_100', name: 'Efsane Seri', icon: '👑', description: '100 günlük seri', condition: (s: any) => s.currentStreak >= 100 },
-  { id: 'habits_50', name: 'Kararlı', icon: '💪', description: '50 alışkanlık tamamla', condition: (s: any) => s.totalHabitsCompleted >= 50 },
-  { id: 'habits_100', name: 'Disiplinli', icon: '🏆', description: '100 alışkanlık tamamla', condition: (s: any) => s.totalHabitsCompleted >= 100 },
-  { id: 'goals_5', name: 'Hedef Makinesi', icon: '🚀', description: '5 hedef tamamla', condition: (s: any) => s.goalsCompleted >= 5 },
-  { id: 'active_30', name: 'Sadık Kullanıcı', icon: '📅', description: '30 gün aktif ol', condition: (s: any) => s.totalDaysActive >= 30 },
-  { id: 'health_week', name: 'Sağlık Takipçisi', icon: '❤️', description: '7 gün sağlık verisi gir', condition: (s: any) => s.healthDays >= 7 },
-  { id: 'mood_week', name: 'Kendini Tanı', icon: '😊', description: '7 gün ruh hali kaydet', condition: (s: any) => s.moodDays >= 7 },
+// Achievement definitions
+const ACHIEVEMENT_DEFINITIONS = [
+  { id: 'first_habit', name_tr: 'İlk Adım', name_en: 'First Step', icon: '🌟', description_tr: 'İlk alışkanlığını tamamla', description_en: 'Complete your first habit', requirement: (stats: any) => stats.totalHabitsCompleted >= 1 },
+  { id: '7_day_streak', name_tr: 'Tutarlı Başlangıç', name_en: 'Consistent Start', icon: '🔥', description_tr: '7 günlük seri', description_en: '7 day streak', requirement: (stats: any) => stats.currentStreak >= 7 },
+  { id: 'water_master', name_tr: 'Su Canavarı', name_en: 'Water Master', icon: '💧', description_tr: '7 gün üst üste 2.5L su iç', description_en: 'Drink 2.5L water for 7 days', requirement: (stats: any) => stats.healthDays >= 7 },
+  { id: '30_day_streak', name_tr: 'Alışkanlık Ustası', name_en: 'Habit Master', icon: '⚡', description_tr: '30 günlük seri', description_en: '30 day streak', requirement: (stats: any) => stats.currentStreak >= 30 },
+  { id: 'first_goal', name_tr: 'Hedef Avcısı', name_en: 'Goal Hunter', icon: '🎯', description_tr: 'İlk hedefini tamamla', description_en: 'Complete your first goal', requirement: (stats: any) => stats.goalsCompleted >= 1 },
+  { id: '100_day_streak', name_tr: 'Efsane Seri', name_en: 'Legend Streak', icon: '👑', description_tr: '100 günlük seri', description_en: '100 day streak', requirement: (stats: any) => stats.longestStreak >= 100 },
+  { id: '50_habits', name_tr: 'Yarı Yüzük', name_en: 'Half Century', icon: '💪', description_tr: '50 alışkanlık tamamla', description_en: 'Complete 50 habits', requirement: (stats: any) => stats.totalHabitsCompleted >= 50 },
+  { id: '100_habits', name_tr: 'Yüzük', name_en: 'Century', icon: '🏆', description_tr: '100 alışkanlık tamamla', description_en: 'Complete 100 habits', requirement: (stats: any) => stats.totalHabitsCompleted >= 100 },
+  { id: '5_goals', name_tr: 'Hedef Makinesi', name_en: 'Goal Machine', icon: '🚀', description_tr: '5 hedef tamamla', description_en: 'Complete 5 goals', requirement: (stats: any) => stats.goalsCompleted >= 5 },
+  { id: '30_days_active', name_tr: 'Bir Ay Aktif', name_en: 'Month Active', icon: '📅', description_tr: '30 gün aktif ol', description_en: 'Be active for 30 days', requirement: (stats: any) => stats.totalDaysActive >= 30 },
+  { id: '7_health_days', name_tr: 'Sağlık Takipçisi', name_en: 'Health Tracker', icon: '❤️', description_tr: '7 gün sağlık kaydı', description_en: '7 days of health logs', requirement: (stats: any) => stats.healthDays >= 7 },
+  { id: '7_mood_days', name_tr: 'Ruh Hali Ustası', name_en: 'Mood Master', icon: '😊', description_tr: '7 gün ruh hali kaydı', description_en: '7 days of mood logs', requirement: (stats: any) => stats.moodDays >= 7 },
 ]
 
 export default function ProfilePage() {
-  const { user } = useAuth()
-  const userId = user?.id
-  
-  const [loading, setLoading] = useState(true)
+  const { user, loading: authLoading } = useAuth()
+  const { t, language } = useTranslation()
   const [isEditing, setIsEditing] = useState(false)
-  const [profile, setProfile] = useState<any>(null)
+  const [name, setName] = useState('')
   const [tempName, setTempName] = useState('')
+  const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({
     totalHabitsCompleted: 0,
     currentStreak: 0,
     longestStreak: 0,
     goalsCompleted: 0,
     totalDaysActive: 0,
-    averageScore: 0,
-    waterStreak: 0,
     healthDays: 0,
     moodDays: 0,
   })
+  const [profile, setProfile] = useState<any>(null)
 
   const supabase = useMemo(() => createClient(), [])
 
   // Fetch profile and stats
   useEffect(() => {
-    if (!userId) {
+    if (!user?.id) {
       setLoading(false)
       return
     }
 
     const fetchData = async () => {
-      setLoading(true)
-      
       try {
         // Fetch profile
         const { data: profileData } = await supabase
           .from('profiles')
           .select('*')
-          .eq('id', userId)
+          .eq('id', user.id)
           .single()
 
         if (profileData) {
           setProfile(profileData)
-          setTempName(profileData.full_name || user?.email?.split('@')[0] || '')
+          setName(profileData.full_name || user.email?.split('@')[0] || '')
+          setTempName(profileData.full_name || user.email?.split('@')[0] || '')
         }
 
-        // Fetch habit logs (completed)
-        const { data: habitLogs } = await supabase
-          .from('habit_logs')
-          .select('date, completed')
-          .eq('user_id', userId)
-          .eq('completed', true)
+        // Fetch stats
+        const [habitLogs, goals, healthEntries, moodEntries] = await Promise.all([
+          supabase.from('habit_logs').select('id, completed_at').eq('user_id', user.id),
+          supabase.from('goals').select('id, status').eq('user_id', user.id),
+          supabase.from('health_entries').select('id, date').eq('user_id', user.id),
+          supabase.from('mood_entries').select('id, date').eq('user_id', user.id),
+        ])
 
-        const totalHabitsCompleted = habitLogs?.length || 0
-        
         // Calculate streak
-        const uniqueDates = [...new Set(habitLogs?.map(l => l.date) || [])].sort().reverse()
+        const dates = [...new Set((habitLogs.data || []).map(l => l.completed_at?.split('T')[0]))].sort().reverse()
         let currentStreak = 0
         let longestStreak = 0
         let tempStreak = 0
-        
         const today = new Date().toISOString().split('T')[0]
-        const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0]
         
-        // Current streak
-        if (uniqueDates.includes(today) || uniqueDates.includes(yesterday)) {
-          for (let i = 0; i < uniqueDates.length; i++) {
-            const expectedDate = new Date(Date.now() - (i * 86400000)).toISOString().split('T')[0]
-            if (uniqueDates.includes(expectedDate)) {
-              currentStreak++
-            } else if (i === 0 && !uniqueDates.includes(today)) {
-              // Bugün yoksa dünden başla
-              continue
-            } else {
-              break
-            }
-          }
-        }
-
-        // Longest streak calculation
-        for (let i = 0; i < uniqueDates.length; i++) {
-          if (i === 0) {
-            tempStreak = 1
+        for (let i = 0; i < dates.length; i++) {
+          const expectedDate = new Date()
+          expectedDate.setDate(expectedDate.getDate() - i)
+          const expected = expectedDate.toISOString().split('T')[0]
+          
+          if (dates.includes(expected)) {
+            tempStreak++
+            if (i === 0 || currentStreak > 0) currentStreak = tempStreak
           } else {
-            const prevDate = new Date(uniqueDates[i - 1])
-            const currDate = new Date(uniqueDates[i])
-            const diff = (prevDate.getTime() - currDate.getTime()) / 86400000
-            
-            if (diff === 1) {
-              tempStreak++
-            } else {
-              longestStreak = Math.max(longestStreak, tempStreak)
-              tempStreak = 1
-            }
+            longestStreak = Math.max(longestStreak, tempStreak)
+            tempStreak = 0
+            if (i === 0) currentStreak = 0
           }
         }
         longestStreak = Math.max(longestStreak, tempStreak, currentStreak)
 
-        // Fetch completed goals
-        const { data: goals } = await supabase
-          .from('goals')
-          .select('status')
-          .eq('user_id', userId)
-
-        const goalsCompleted = goals?.filter(g => g.status === 'completed').length || 0
-
-        // Total active days (unique dates with any activity)
-        const totalDaysActive = uniqueDates.length
-
-        // Fetch health entries count
-        const { data: healthEntries } = await supabase
-          .from('health_entries')
-          .select('date')
-          .eq('user_id', userId)
-
-        const healthDays = healthEntries?.length || 0
-
-        // Fetch mood entries count
-        const { data: moodEntries } = await supabase
-          .from('mood_entries')
-          .select('date')
-          .eq('user_id', userId)
-
-        const moodDays = moodEntries?.length || 0
-
-        // Calculate average score (based on completion rate)
-        const averageScore = totalDaysActive > 0 
-          ? Math.round((totalHabitsCompleted / (totalDaysActive * 3)) * 100) // Assuming ~3 habits average
-          : 0
+        // Unique active days
+        const uniqueDays = new Set(dates)
 
         setStats({
-          totalHabitsCompleted,
+          totalHabitsCompleted: habitLogs.data?.length || 0,
           currentStreak,
           longestStreak,
-          goalsCompleted,
-          totalDaysActive,
-          averageScore: Math.min(100, averageScore),
-          waterStreak: 0, // TODO: Calculate from health_entries
-          healthDays,
-          moodDays,
+          goalsCompleted: (goals.data || []).filter(g => g.status === 'completed').length,
+          totalDaysActive: uniqueDays.size,
+          healthDays: new Set((healthEntries.data || []).map(h => h.date)).size,
+          moodDays: new Set((moodEntries.data || []).map(m => m.date)).size,
         })
-
       } catch (err) {
-        console.error('Error fetching profile data:', err)
+        console.error('Error fetching profile:', err)
       } finally {
         setLoading(false)
       }
     }
 
     fetchData()
-  }, [userId, supabase, user])
-
-  // Calculate unlocked achievements
-  const achievements = useMemo(() => {
-    return ALL_ACHIEVEMENTS.map(a => ({
-      ...a,
-      unlocked: a.condition(stats)
-    }))
-  }, [stats])
-
-  const unlockedCount = achievements.filter(a => a.unlocked).length
-  const totalAchievements = achievements.length
+  }, [user?.id, supabase])
 
   const handleSave = async () => {
-    if (!userId) return
+    if (!user?.id) return
 
     try {
       const { error } = await supabase
         .from('profiles')
-        .update({ full_name: tempName })
-        .eq('id', userId)
+        .upsert({ id: user.id, full_name: tempName, updated_at: new Date().toISOString() })
 
       if (error) throw error
 
-      setProfile((prev: any) => ({ ...prev, full_name: tempName }))
+      setName(tempName)
       setIsEditing(false)
-      toast.success('Profil güncellendi!')
+      toast.success(t.profile.name_updated)
     } catch (err) {
-      console.error('Error updating profile:', err)
-      toast.error('Güncelleme başarısız')
+      toast.error(t.error)
     }
   }
 
   const handleCancel = () => {
-    setTempName(profile?.full_name || '')
+    setTempName(name)
     setIsEditing(false)
   }
 
-  const displayName = profile?.full_name || user?.email?.split('@')[0] || 'Kullanıcı'
-  const joinDate = profile?.created_at || user?.created_at
+  // Calculate achievements
+  const achievements = ACHIEVEMENT_DEFINITIONS.map(a => ({
+    ...a,
+    name: language === 'tr' ? a.name_tr : a.name_en,
+    description: language === 'tr' ? a.description_tr : a.description_en,
+    unlocked: a.requirement(stats),
+  }))
 
-  if (loading) {
+  const unlockedCount = achievements.filter(a => a.unlocked).length
+  const totalAchievements = achievements.length
+
+  // Loading state
+  if (authLoading || loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+      <div className="space-y-6 animate-pulse">
+        <div className="h-8 bg-muted rounded w-32" />
+        <div className="grid lg:grid-cols-3 gap-6">
+          <div className="h-64 bg-muted rounded-xl" />
+          <div className="lg:col-span-2 h-64 bg-muted rounded-xl" />
+        </div>
+      </div>
+    )
+  }
+
+  // Not logged in state
+  if (!user) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <User className="w-7 h-7 text-primary" />
+            {t.profile.title}
+          </h1>
+          <p className="text-muted-foreground">{t.profile.subtitle}</p>
+        </div>
+
+        <Card className="max-w-md mx-auto">
+          <CardContent className="pt-6 text-center">
+            <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+              <LogIn className="w-10 h-10 text-primary" />
+            </div>
+            <h2 className="text-xl font-bold mb-2">
+              {language === 'tr' ? 'Giriş Yapın' : 'Sign In'}
+            </h2>
+            <p className="text-muted-foreground mb-6">
+              {language === 'tr' 
+                ? 'Profilinizi görüntülemek ve verilerinize erişmek için giriş yapın.' 
+                : 'Sign in to view your profile and access your data.'}
+            </p>
+            <div className="flex flex-col gap-3">
+              <Button asChild className="w-full">
+                <Link href="/login">
+                  <LogIn className="w-4 h-4 mr-2" />
+                  {language === 'tr' ? 'Giriş Yap' : 'Sign In'}
+                </Link>
+              </Button>
+              <Button asChild variant="outline" className="w-full">
+                <Link href="/signup">
+                  {language === 'tr' ? 'Hesap Oluştur' : 'Create Account'}
+                </Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     )
   }
@@ -244,77 +234,64 @@ export default function ProfilePage() {
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <User className="w-7 h-7 text-primary" />
-          Profil
+          {t.profile.title}
         </h1>
-        <p className="text-muted-foreground">Hesap bilgilerin ve başarıların</p>
+        <p className="text-muted-foreground">{t.profile.subtitle}</p>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Profile Card */}
-        <Card className="lg:col-span-1">
+        <Card>
           <CardContent className="pt-6">
             <div className="flex flex-col items-center text-center">
               {/* Avatar */}
               <div className="relative mb-4">
-                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-4xl text-white font-bold">
-                  {displayName.charAt(0).toUpperCase()}
+                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center text-4xl text-white font-bold">
+                  {name.charAt(0).toUpperCase() || '?'}
                 </div>
-                <button className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-secondary border-2 border-background flex items-center justify-center hover:bg-accent transition-colors">
-                  <Camera className="w-4 h-4" />
-                </button>
               </div>
 
               {/* Name */}
               {isEditing ? (
-                <div className="flex items-center gap-2 mb-2">
+                <div className="flex items-center gap-2 mb-2 w-full max-w-[200px]">
                   <Input
                     value={tempName}
                     onChange={(e) => setTempName(e.target.value)}
                     className="text-center"
+                    autoFocus
                   />
                   <Button size="icon" variant="ghost" onClick={handleSave}>
-                    <Save className="w-4 h-4 text-green-500" />
+                    <Save className="w-4 h-4" />
                   </Button>
                   <Button size="icon" variant="ghost" onClick={handleCancel}>
-                    <X className="w-4 h-4 text-red-500" />
+                    <X className="w-4 h-4" />
                   </Button>
                 </div>
               ) : (
                 <div className="flex items-center gap-2 mb-2">
-                  <h2 className="text-xl font-bold">{displayName}</h2>
-                  <button onClick={() => { setTempName(displayName); setIsEditing(true); }}>
-                    <Edit2 className="w-4 h-4 text-muted-foreground hover:text-foreground" />
-                  </button>
+                  <h2 className="text-xl font-bold">{name}</h2>
+                  <Button size="icon" variant="ghost" onClick={() => setIsEditing(true)}>
+                    <Edit2 className="w-4 h-4" />
+                  </Button>
                 </div>
               )}
 
               {/* Email */}
               <p className="text-sm text-muted-foreground flex items-center gap-1 mb-4">
                 <Mail className="w-4 h-4" />
-                {user?.email}
+                {user.email}
               </p>
 
-              {/* Tier Badge */}
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-secondary text-sm font-medium mb-4">
-                🆓 Ücretsiz Plan
+              {/* Member since */}
+              <div className="text-sm text-muted-foreground">
+                <Calendar className="w-4 h-4 inline mr-1" />
+                {t.profile.member_since}: {new Date(user.created_at || profile?.created_at || Date.now()).toLocaleDateString(language === 'tr' ? 'tr-TR' : 'en-US')}
               </div>
 
-              {/* Join Date */}
-              {joinDate && (
-                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Calendar className="w-3 h-3" />
-                  {new Date(joinDate).toLocaleDateString('tr-TR', { 
-                    year: 'numeric', 
-                    month: 'long', 
-                    day: 'numeric' 
-                  })} tarihinde katıldı
-                </p>
-              )}
-
-              {/* Upgrade Button */}
-              <Button className="w-full mt-6 bg-gradient-to-r from-primary to-accent">
-                Pro'ya Yükselt
-              </Button>
+              {/* Plan badge */}
+              <div className="mt-4 px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium">
+                🆓 {language === 'tr' ? 'Ücretsiz Plan' : 'Free Plan'}
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -322,125 +299,64 @@ export default function ProfilePage() {
         {/* Stats & Achievements */}
         <div className="lg:col-span-2 space-y-6">
           {/* Stats Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-            >
-              <Card>
-                <CardContent className="pt-4 text-center">
-                  <Target className="w-8 h-8 mx-auto mb-2 text-primary" />
-                  <p className="text-2xl font-bold">{stats.totalHabitsCompleted}</p>
-                  <p className="text-xs text-muted-foreground">Tamamlanan Alışkanlık</p>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-            >
-              <Card>
-                <CardContent className="pt-4 text-center">
-                  <Flame className="w-8 h-8 mx-auto mb-2 text-orange-500" />
-                  <p className="text-2xl font-bold">{stats.currentStreak}</p>
-                  <p className="text-xs text-muted-foreground">Güncel Seri</p>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-            >
-              <Card>
-                <CardContent className="pt-4 text-center">
-                  <Trophy className="w-8 h-8 mx-auto mb-2 text-yellow-500" />
-                  <p className="text-2xl font-bold">{stats.longestStreak}</p>
-                  <p className="text-xs text-muted-foreground">En Uzun Seri</p>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
-            >
-              <Card>
-                <CardContent className="pt-4 text-center">
-                  <TrendingUp className="w-8 h-8 mx-auto mb-2 text-green-500" />
-                  <p className="text-2xl font-bold">{stats.goalsCompleted}</p>
-                  <p className="text-xs text-muted-foreground">Tamamlanan Hedef</p>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5 }}
-            >
-              <Card>
-                <CardContent className="pt-4 text-center">
-                  <Calendar className="w-8 h-8 mx-auto mb-2 text-blue-500" />
-                  <p className="text-2xl font-bold">{stats.totalDaysActive}</p>
-                  <p className="text-xs text-muted-foreground">Aktif Gün</p>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.6 }}
-            >
-              <Card>
-                <CardContent className="pt-4 text-center">
-                  <Heart className="w-8 h-8 mx-auto mb-2 text-red-500" />
-                  <p className="text-2xl font-bold">{stats.healthDays}</p>
-                  <p className="text-xs text-muted-foreground">Sağlık Kaydı</p>
-                </CardContent>
-              </Card>
-            </motion.div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <Card>
+              <CardContent className="pt-4 text-center">
+                <Target className="w-6 h-6 mx-auto mb-2 text-primary" />
+                <p className="text-2xl font-bold">{stats.totalHabitsCompleted}</p>
+                <p className="text-xs text-muted-foreground">{t.profile.total_habits}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-4 text-center">
+                <Flame className="w-6 h-6 mx-auto mb-2 text-orange-500" />
+                <p className="text-2xl font-bold">{stats.currentStreak}</p>
+                <p className="text-xs text-muted-foreground">{t.profile.current_streak}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-4 text-center">
+                <TrendingUp className="w-6 h-6 mx-auto mb-2 text-green-500" />
+                <p className="text-2xl font-bold">{stats.goalsCompleted}</p>
+                <p className="text-xs text-muted-foreground">{t.profile.completed_goals}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-4 text-center">
+                <Calendar className="w-6 h-6 mx-auto mb-2 text-blue-500" />
+                <p className="text-2xl font-bold">{stats.totalDaysActive}</p>
+                <p className="text-xs text-muted-foreground">{t.profile.days_active}</p>
+              </CardContent>
+            </Card>
           </div>
 
           {/* Achievements */}
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <Trophy className="w-5 h-5 text-yellow-500" />
-                  Başarılar
-                </CardTitle>
-                <span className="text-sm text-muted-foreground">
-                  {unlockedCount}/{totalAchievements}
-                </span>
-              </div>
-              <Progress value={(unlockedCount / totalAchievements) * 100} className="h-2" />
+              <CardTitle className="flex items-center gap-2">
+                <Trophy className="w-5 h-5 text-yellow-500" />
+                {t.profile.achievements} ({unlockedCount}/{totalAchievements})
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
                 {achievements.map((achievement) => (
                   <motion.div
                     key={achievement.id}
-                    whileHover={{ scale: 1.02 }}
-                    className={`p-3 rounded-xl border ${
-                      achievement.unlocked 
-                        ? 'bg-secondary/50 border-primary/30' 
-                        : 'bg-secondary/20 border-border opacity-50'
+                    className={`relative p-3 rounded-xl text-center transition-all ${
+                      achievement.unlocked
+                        ? 'bg-gradient-to-br from-yellow-500/20 to-orange-500/20 border border-yellow-500/30'
+                        : 'bg-muted/50 opacity-50 grayscale'
                     }`}
+                    whileHover={{ scale: achievement.unlocked ? 1.05 : 1 }}
+                    title={achievement.description}
                   >
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-2xl">{achievement.icon}</span>
-                      <span className="font-medium text-sm">{achievement.name}</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">{achievement.description}</p>
+                    <div className="text-2xl mb-1">{achievement.icon}</div>
+                    <p className="text-[10px] font-medium truncate">{achievement.name}</p>
                     {achievement.unlocked && (
-                      <span className="text-xs text-green-500 mt-1 block">✓ Kazanıldı</span>
+                      <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
+                        <span className="text-[8px] text-white">✓</span>
+                      </div>
                     )}
                   </motion.div>
                 ))}

@@ -1,156 +1,268 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import type { Project } from '@/types'
-import toast from 'react-hot-toast'
+import { useAuth } from './use-auth'
+import type { Project, ProjectTask } from '@/types'
 
-export function useProjects(userId: string | undefined) {
+export function useProjects() {
+  const { user } = useAuth()
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<Error | null>(null)
   
   const supabase = useMemo(() => createClient(), [])
 
-  // Fetch projects
-  const fetchProjects = useCallback(async () => {
-    if (!userId) {
+  // Fetch projects with tasks
+  useEffect(() => {
+    if (!user?.id) {
       setProjects([])
       setLoading(false)
       return
     }
 
-    try {
-      setLoading(true)
-      const { data, error } = await supabase
-        .from('projects')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
+    const fetchProjects = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('projects')
+          .select(`
+            *,
+            tasks:project_tasks(*)
+          `)
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
 
-      if (error) throw error
-      setProjects(data || [])
-    } catch (err) {
-      setError(err as Error)
-      console.error('Error fetching projects:', err)
-    } finally {
-      setLoading(false)
+        if (error) throw error
+        setProjects(data || [])
+      } catch (err) {
+        console.error('Error fetching projects:', err)
+      } finally {
+        setLoading(false)
+      }
     }
-  }, [userId, supabase])
 
-  useEffect(() => {
     fetchProjects()
-  }, [fetchProjects])
+  }, [user?.id, supabase])
 
   // Add project
-  const addProject = async (project: { name: string; description?: string | null; priority: string; deadline?: string | null; color: string }) => {
-    if (!userId) return null
+  const addProject = useCallback(async (projectData: {
+    name: string
+    description?: string
+    status?: string
+    priority?: string
+    due_date?: string
+    color?: string
+  }) => {
+    if (!user?.id) return null
+
+    const newProject = {
+      user_id: user.id,
+      name: projectData.name,
+      description: projectData.description || null,
+      status: projectData.status || 'active',
+      priority: projectData.priority || 'medium',
+      due_date: projectData.due_date || null,
+      color: projectData.color || '#8B5CF6',
+    }
+
+    // Optimistic update
+    const tempId = `temp-${Date.now()}`
+    const optimisticProject = { ...newProject, id: tempId, tasks: [], created_at: new Date().toISOString(), updated_at: new Date().toISOString() } as Project
+    setProjects(prev => [optimisticProject, ...prev])
 
     try {
       const { data, error } = await supabase
         .from('projects')
-        .insert({
-          name: project.name,
-          description: project.description || null,
-          priority: project.priority,
-          deadline: project.deadline || null,
-          color: project.color,
-          user_id: userId,
-          progress: 0,
-          status: 'active',
-        })
+        .insert(newProject)
         .select()
         .single()
 
       if (error) throw error
-      
-      setProjects(prev => [data, ...prev])
-      toast.success('Proje eklendi!')
+
+      // Replace temp with real
+      setProjects(prev => prev.map(p => p.id === tempId ? { ...data, tasks: [] } : p))
       return data
     } catch (err) {
+      // Rollback
+      setProjects(prev => prev.filter(p => p.id !== tempId))
       console.error('Error adding project:', err)
-      toast.error('Proje eklenemedi')
       return null
     }
-  }
+  }, [user?.id, supabase])
 
   // Update project
-  const updateProject = async (id: string, updates: Partial<Project>) => {
-    // Optimistic update
-    setProjects(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p))
+  const updateProject = useCallback(async (id: string, updates: Partial<Project>) => {
+    if (!user?.id) return false
+
+    const prevProjects = [...projects]
     
+    // Optimistic update
+    setProjects(prev => prev.map(p => p.id === id ? { ...p, ...updates, updated_at: new Date().toISOString() } : p))
+
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('projects')
-        .update(updates)
+        .update({ ...updates, updated_at: new Date().toISOString() })
         .eq('id', id)
-        .select()
-        .single()
+        .eq('user_id', user.id)
 
       if (error) throw error
-      
-      setProjects(prev => prev.map(p => p.id === id ? data : p))
-      return data
+      return true
     } catch (err) {
+      // Rollback
+      setProjects(prevProjects)
       console.error('Error updating project:', err)
-      toast.error('Güncelleme başarısız')
-      fetchProjects() // Rollback
-      return null
+      return false
     }
-  }
-
-  // Update progress
-  const updateProgress = async (id: string, progress: number) => {
-    const newProgress = Math.min(100, Math.max(0, progress))
-    const newStatus = newProgress >= 100 ? 'completed' : 'active'
-    
-    await updateProject(id, { 
-      progress: newProgress,
-      status: newStatus 
-    })
-
-    if (newProgress >= 100) {
-      toast.success('🎉 Proje tamamlandı!')
-    }
-  }
+  }, [user?.id, supabase, projects])
 
   // Delete project
-  const deleteProject = async (id: string) => {
+  const deleteProject = useCallback(async (id: string) => {
+    if (!user?.id) return false
+
+    const prevProjects = [...projects]
+    
     // Optimistic update
     setProjects(prev => prev.filter(p => p.id !== id))
-    
+
     try {
       const { error } = await supabase
         .from('projects')
         .delete()
         .eq('id', id)
+        .eq('user_id', user.id)
 
       if (error) throw error
-      
-      toast.success('Proje silindi')
+      return true
     } catch (err) {
+      // Rollback
+      setProjects(prevProjects)
       console.error('Error deleting project:', err)
-      toast.error('Silme başarısız')
-      fetchProjects() // Rollback
+      return false
     }
-  }
+  }, [user?.id, supabase, projects])
 
-  // Stats
-  const activeProjects = projects.filter(p => p.status === 'active')
-  const completedProjects = projects.filter(p => p.status === 'completed')
-  const pausedProjects = projects.filter(p => p.status === 'paused')
+  // Add task to project
+  const addTask = useCallback(async (projectId: string, taskData: {
+    title: string
+    description?: string
+  }) => {
+    if (!user?.id) return null
+
+    const newTask = {
+      project_id: projectId,
+      user_id: user.id,
+      title: taskData.title,
+      description: taskData.description || null,
+      completed: false,
+    }
+
+    // Optimistic update
+    const tempId = `temp-${Date.now()}`
+    const optimisticTask = { ...newTask, id: tempId, created_at: new Date().toISOString() } as ProjectTask
+    setProjects(prev => prev.map(p => 
+      p.id === projectId 
+        ? { ...p, tasks: [...(p.tasks || []), optimisticTask] }
+        : p
+    ))
+
+    try {
+      const { data, error } = await supabase
+        .from('project_tasks')
+        .insert(newTask)
+        .select()
+        .single()
+
+      if (error) throw error
+
+      // Replace temp with real
+      setProjects(prev => prev.map(p => 
+        p.id === projectId 
+          ? { ...p, tasks: (p.tasks || []).map(t => t.id === tempId ? data : t) }
+          : p
+      ))
+      return data
+    } catch (err) {
+      // Rollback
+      setProjects(prev => prev.map(p => 
+        p.id === projectId 
+          ? { ...p, tasks: (p.tasks || []).filter(t => t.id !== tempId) }
+          : p
+      ))
+      console.error('Error adding task:', err)
+      return null
+    }
+  }, [user?.id, supabase])
+
+  // Toggle task completion
+  const toggleTask = useCallback(async (projectId: string, taskId: string) => {
+    const project = projects.find(p => p.id === projectId)
+    const task = project?.tasks?.find(t => t.id === taskId)
+    if (!task) return false
+
+    const newCompleted = !task.completed
+
+    // Optimistic update
+    setProjects(prev => prev.map(p => 
+      p.id === projectId 
+        ? { ...p, tasks: (p.tasks || []).map(t => t.id === taskId ? { ...t, completed: newCompleted } : t) }
+        : p
+    ))
+
+    try {
+      const { error } = await supabase
+        .from('project_tasks')
+        .update({ completed: newCompleted })
+        .eq('id', taskId)
+
+      if (error) throw error
+      return true
+    } catch (err) {
+      // Rollback
+      setProjects(prev => prev.map(p => 
+        p.id === projectId 
+          ? { ...p, tasks: (p.tasks || []).map(t => t.id === taskId ? { ...t, completed: !newCompleted } : t) }
+          : p
+      ))
+      console.error('Error toggling task:', err)
+      return false
+    }
+  }, [projects, supabase])
+
+  // Delete task
+  const deleteTask = useCallback(async (projectId: string, taskId: string) => {
+    const prevProjects = [...projects]
+
+    // Optimistic update
+    setProjects(prev => prev.map(p => 
+      p.id === projectId 
+        ? { ...p, tasks: (p.tasks || []).filter(t => t.id !== taskId) }
+        : p
+    ))
+
+    try {
+      const { error } = await supabase
+        .from('project_tasks')
+        .delete()
+        .eq('id', taskId)
+
+      if (error) throw error
+      return true
+    } catch (err) {
+      // Rollback
+      setProjects(prevProjects)
+      console.error('Error deleting task:', err)
+      return false
+    }
+  }, [projects, supabase])
 
   return {
     projects,
     loading,
-    error,
-    activeCount: activeProjects.length,
-    completedCount: completedProjects.length,
-    pausedCount: pausedProjects.length,
     addProject,
     updateProject,
-    updateProgress,
     deleteProject,
-    refetch: fetchProjects,
+    addTask,
+    toggleTask,
+    deleteTask,
   }
 }

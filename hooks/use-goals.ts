@@ -1,162 +1,161 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useAuth } from './use-auth'
 import type { Goal } from '@/types'
-import toast from 'react-hot-toast'
 
-export function useGoals(userId: string | undefined) {
+export function useGoals() {
+  const { user } = useAuth()
   const [goals, setGoals] = useState<Goal[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<Error | null>(null)
   
   const supabase = useMemo(() => createClient(), [])
 
   // Fetch goals
-  const fetchGoals = useCallback(async () => {
-    if (!userId) {
+  useEffect(() => {
+    if (!user?.id) {
       setGoals([])
       setLoading(false)
       return
     }
 
-    try {
-      setLoading(true)
-      const { data, error } = await supabase
-        .from('goals')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
+    const fetchGoals = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('goals')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
 
-      if (error) throw error
-      setGoals(data || [])
-    } catch (err) {
-      setError(err as Error)
-      console.error('Error fetching goals:', err)
-    } finally {
-      setLoading(false)
+        if (error) throw error
+        setGoals(data || [])
+      } catch (err) {
+        console.error('Error fetching goals:', err)
+      } finally {
+        setLoading(false)
+      }
     }
-  }, [userId, supabase])
 
-  useEffect(() => {
     fetchGoals()
-  }, [fetchGoals])
+  }, [user?.id, supabase])
 
-  // Add goal - sadece title kullan (name yok tabloda)
-  const addGoal = async (goal: { title: string; description?: string | null; target_value: number; unit: string; deadline?: string | null; category: string }) => {
-    if (!userId) return null
+  // Add goal
+  const addGoal = useCallback(async (goalData: {
+    title: string
+    description?: string
+    target_value: number
+    current_value?: number
+    unit: string
+    deadline?: string
+    category: string
+  }) => {
+    if (!user?.id) return null
+
+    const newGoal = {
+      user_id: user.id,
+      title: goalData.title,
+      description: goalData.description || null,
+      target_value: goalData.target_value,
+      current_value: goalData.current_value || 0,
+      unit: goalData.unit,
+      deadline: goalData.deadline || null,
+      category: goalData.category,
+      status: 'active',
+    }
+
+    // Optimistic update
+    const tempId = `temp-${Date.now()}`
+    const optimisticGoal = { ...newGoal, id: tempId, created_at: new Date().toISOString(), updated_at: new Date().toISOString() } as Goal
+    setGoals(prev => [optimisticGoal, ...prev])
 
     try {
       const { data, error } = await supabase
         .from('goals')
-        .insert({
-          title: goal.title,
-          description: goal.description || null,
-          target_value: goal.target_value,
-          unit: goal.unit,
-          deadline: goal.deadline || null,
-          category: goal.category,
-          user_id: userId,
-          current_value: 0,
-          status: 'active',
-        })
+        .insert(newGoal)
         .select()
         .single()
 
       if (error) throw error
-      
-      setGoals(prev => [data, ...prev])
-      toast.success('Hedef eklendi!')
+
+      // Replace temp with real
+      setGoals(prev => prev.map(g => g.id === tempId ? data : g))
       return data
     } catch (err) {
+      // Rollback
+      setGoals(prev => prev.filter(g => g.id !== tempId))
       console.error('Error adding goal:', err)
-      toast.error('Hedef eklenemedi')
       return null
     }
-  }
+  }, [user?.id, supabase])
 
   // Update goal
-  const updateGoal = async (id: string, updates: Partial<Goal>) => {
-    // Optimistic update
-    setGoals(prev => prev.map(g => g.id === id ? { ...g, ...updates } : g))
+  const updateGoal = useCallback(async (id: string, updates: Partial<Goal>) => {
+    if (!user?.id) return false
+
+    const prevGoals = [...goals]
     
+    // Optimistic update
+    setGoals(prev => prev.map(g => g.id === id ? { ...g, ...updates, updated_at: new Date().toISOString() } : g))
+
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('goals')
-        .update(updates)
+        .update({ ...updates, updated_at: new Date().toISOString() })
         .eq('id', id)
-        .select()
-        .single()
+        .eq('user_id', user.id)
 
       if (error) throw error
-      
-      setGoals(prev => prev.map(g => g.id === id ? data : g))
-      return data
+      return true
     } catch (err) {
+      // Rollback
+      setGoals(prevGoals)
       console.error('Error updating goal:', err)
-      toast.error('Güncelleme başarısız')
-      fetchGoals() // Rollback
-      return null
+      return false
     }
-  }
-
-  // Update progress
-  const updateProgress = async (id: string, value: number) => {
-    const goal = goals.find(g => g.id === id)
-    if (!goal) return
-
-    const newValue = Math.min(goal.target_value, Math.max(0, value))
-    const newStatus = newValue >= goal.target_value ? 'completed' : 'active'
-    
-    await updateGoal(id, { 
-      current_value: newValue,
-      status: newStatus 
-    })
-
-    if (newStatus === 'completed' && goal.status !== 'completed') {
-      toast.success('🎉 Hedef tamamlandı!')
-    }
-  }
+  }, [user?.id, supabase, goals])
 
   // Delete goal
-  const deleteGoal = async (id: string) => {
+  const deleteGoal = useCallback(async (id: string) => {
+    if (!user?.id) return false
+
+    const prevGoals = [...goals]
+    
     // Optimistic update
     setGoals(prev => prev.filter(g => g.id !== id))
-    
+
     try {
       const { error } = await supabase
         .from('goals')
         .delete()
         .eq('id', id)
+        .eq('user_id', user.id)
 
       if (error) throw error
-      
-      toast.success('Hedef silindi')
+      return true
     } catch (err) {
+      // Rollback
+      setGoals(prevGoals)
       console.error('Error deleting goal:', err)
-      toast.error('Silme başarısız')
-      fetchGoals() // Rollback
+      return false
     }
-  }
+  }, [user?.id, supabase, goals])
 
-  // Stats
-  const activeGoals = goals.filter(g => g.status === 'active')
-  const completedGoals = goals.filter(g => g.status === 'completed')
-  const avgProgress = goals.length > 0 
-    ? Math.round(goals.reduce((acc, g) => acc + (g.current_value / g.target_value) * 100, 0) / goals.length)
-    : 0
+  // Update progress
+  const updateProgress = useCallback(async (id: string, currentValue: number) => {
+    const goal = goals.find(g => g.id === id)
+    if (!goal) return false
+
+    const newStatus = currentValue >= goal.target_value ? 'completed' : 'active'
+    return updateGoal(id, { current_value: currentValue, status: newStatus })
+  }, [goals, updateGoal])
 
   return {
     goals,
     loading,
-    error,
-    activeCount: activeGoals.length,
-    completedCount: completedGoals.length,
-    avgProgress,
     addGoal,
     updateGoal,
-    updateProgress,
     deleteGoal,
-    refetch: fetchGoals,
+    updateProgress,
   }
 }

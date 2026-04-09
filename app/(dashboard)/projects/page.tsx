@@ -2,302 +2,403 @@
 
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, FolderKanban, Clock, CheckCircle, Pause } from 'lucide-react'
-import { cn, COLOR_OPTIONS } from '@/lib/utils'
+import { Plus, FolderKanban, Clock, CheckCircle, Pause, Play, Trash2, X } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
-import { ProjectCard } from '@/components/projects/project-card'
+import { Progress } from '@/components/ui/progress'
 import { useProjects } from '@/hooks/use-projects'
-import { useAuth } from '@/hooks/use-auth'
+import { useTranslation } from '@/hooks/use-translation'
 import type { Project } from '@/types'
+import toast from 'react-hot-toast'
+
+const COLOR_OPTIONS = ['#8B5CF6', '#3B82F6', '#22C55E', '#F97316', '#EC4899', '#14B8A6', '#EAB308', '#EF4444']
 
 const PRIORITIES = [
-  { id: 'low', label: 'Düşük', color: 'bg-blue-500' },
-  { id: 'medium', label: 'Orta', color: 'bg-yellow-500' },
-  { id: 'high', label: 'Yüksek', color: 'bg-red-500' },
+  { id: 'low', label_tr: 'Düşük', label_en: 'Low', color: 'bg-blue-500' },
+  { id: 'medium', label_tr: 'Orta', label_en: 'Medium', color: 'bg-yellow-500' },
+  { id: 'high', label_tr: 'Yüksek', label_en: 'High', color: 'bg-red-500' },
 ]
 
 export default function ProjectsPage() {
-  const { user } = useAuth()
-  const userId = user?.id
-
-  const { 
-    projects, 
-    loading,
-    activeCount,
-    completedCount,
-    pausedCount,
-    addProject,
-    updateProgress,
-    updateProject,
-    deleteProject 
-  } = useProjects(userId)
-
+  const { t, language } = useTranslation()
+  const { projects, loading, addProject, updateProject, deleteProject } = useProjects()
   const [filter, setFilter] = useState<'all' | 'active' | 'paused' | 'completed'>('all')
   const [showAddModal, setShowAddModal] = useState(false)
-  const [newProject, setNewProject] = useState({
-    name: '',
-    description: '',
-    priority: 'medium' as Project['priority'],
-    deadline: '',
-    color: COLOR_OPTIONS[0],
-  })
 
   const filteredProjects = projects.filter(p => {
     if (filter === 'all') return true
     return p.status === filter
   })
 
+  const activeCount = projects.filter(p => p.status === 'active').length
+  const completedCount = projects.filter(p => p.status === 'completed').length
+  const pausedCount = projects.filter(p => p.status === 'paused').length
+
   const handleUpdateProgress = async (id: string, progress: number) => {
-    await updateProgress(id, progress)
+    const newProgress = Math.min(100, Math.max(0, progress))
+    const newStatus = newProgress >= 100 ? 'completed' : 'active'
+    await updateProject(id, { progress: newProgress, status: newStatus })
   }
 
   const handleStatusChange = async (id: string, status: Project['status']) => {
-    await updateProject(id, { status, progress: status === 'completed' ? 100 : undefined })
+    await updateProject(id, { 
+      status, 
+      progress: status === 'completed' ? 100 : undefined 
+    })
+    toast.success(language === 'tr' ? 'Durum güncellendi' : 'Status updated')
   }
 
   const handleDelete = async (id: string) => {
-    await deleteProject(id)
-  }
-
-  const handleAddProject = async () => {
-    if (!newProject.name.trim()) return
-    
-    await addProject({
-      name: newProject.name,
-      description: newProject.description || null,
-      priority: newProject.priority,
-      deadline: newProject.deadline || null,
-      color: newProject.color,
-    })
-    
-    setNewProject({ name: '', description: '', priority: 'medium', deadline: '', color: COLOR_OPTIONS[0] })
-    setShowAddModal(false)
+    if (confirm(t.messages.delete_confirm)) {
+      await deleteProject(id)
+      toast.success(language === 'tr' ? 'Proje silindi' : 'Project deleted')
+    }
   }
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+      <div className="space-y-6 animate-pulse">
+        <div className="h-10 bg-muted rounded w-48" />
+        <div className="grid grid-cols-3 gap-4">
+          {[1,2,3].map(i => <div key={i} className="h-20 bg-muted rounded-xl" />)}
+        </div>
+        <div className="space-y-4">
+          {[1,2,3].map(i => <div key={i} className="h-32 bg-muted rounded-xl" />)}
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-20">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold">Projeler</h1>
-          <p className="text-muted-foreground">Büyük işleri yönetilebilir parçalara böl</p>
+          <h1 className="text-2xl md:text-3xl font-bold">{t.projects.title}</h1>
+          <p className="text-muted-foreground">{t.projects.subtitle}</p>
         </div>
         <Button onClick={() => setShowAddModal(true)}>
           <Plus className="w-4 h-4 mr-2" />
-          Yeni Proje
+          {t.projects.add_new}
         </Button>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
-                <FolderKanban className="w-5 h-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{projects.length}</p>
-                <p className="text-xs text-muted-foreground">Toplam proje</p>
-              </div>
-            </div>
+          <CardContent className="pt-4 text-center">
+            <p className="text-2xl font-bold text-primary">{activeCount}</p>
+            <p className="text-xs text-muted-foreground">{t.projects.active}</p>
           </CardContent>
         </Card>
-
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center">
-                <Clock className="w-5 h-5 text-blue-500" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{activeCount}</p>
-                <p className="text-xs text-muted-foreground">Aktif</p>
-              </div>
-            </div>
+          <CardContent className="pt-4 text-center">
+            <p className="text-2xl font-bold text-green-500">{completedCount}</p>
+            <p className="text-xs text-muted-foreground">{t.projects.completed}</p>
           </CardContent>
         </Card>
-
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-yellow-500/20 flex items-center justify-center">
-                <Pause className="w-5 h-5 text-yellow-500" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{pausedCount}</p>
-                <p className="text-xs text-muted-foreground">Duraklatılmış</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-green-500/20 flex items-center justify-center">
-                <CheckCircle className="w-5 h-5 text-green-500" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{completedCount}</p>
-                <p className="text-xs text-muted-foreground">Tamamlanan</p>
-              </div>
-            </div>
+          <CardContent className="pt-4 text-center">
+            <p className="text-2xl font-bold text-yellow-500">{pausedCount}</p>
+            <p className="text-xs text-muted-foreground">{t.projects.paused}</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Filter tabs */}
-      <div className="flex gap-2">
+      {/* Filter */}
+      <div className="flex gap-2 overflow-x-auto pb-2">
         {(['all', 'active', 'paused', 'completed'] as const).map((f) => (
           <Button
             key={f}
             variant={filter === f ? 'default' : 'outline'}
             size="sm"
             onClick={() => setFilter(f)}
+            className="shrink-0"
           >
-            {f === 'all' ? 'Tümü' : f === 'active' ? 'Aktif' : f === 'paused' ? 'Duraklatılmış' : 'Tamamlanan'}
+            {f === 'all' ? t.all : 
+             f === 'active' ? t.projects.active : 
+             f === 'paused' ? t.projects.paused : 
+             t.projects.completed}
           </Button>
         ))}
       </div>
 
-      {/* Projects grid */}
-      <div className="grid md:grid-cols-2 gap-4">
-        <AnimatePresence>
-          {filteredProjects.map((project) => (
-            <ProjectCard
+      {/* Projects List */}
+      <div className="space-y-4">
+        {filteredProjects.length === 0 ? (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <FolderKanban className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+              <h3 className="font-medium mb-2">{t.projects.no_projects}</h3>
+              <p className="text-sm text-muted-foreground mb-4">{t.projects.create_first}</p>
+              <Button onClick={() => setShowAddModal(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                {t.projects.add_new}
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          filteredProjects.map((project) => (
+            <motion.div
               key={project.id}
-              project={project}
-              onUpdateProgress={handleUpdateProgress}
-              onStatusChange={handleStatusChange}
-              onDelete={handleDelete}
-            />
-          ))}
-        </AnimatePresence>
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              <Card className={cn(
+                project.status === 'completed' && 'border-green-500/30 bg-green-500/5',
+                project.status === 'paused' && 'border-yellow-500/30 bg-yellow-500/5'
+              )}>
+                <CardContent className="pt-4">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <div 
+                        className="w-3 h-3 rounded-full"
+                        style={{ backgroundColor: project.color }}
+                      />
+                      <div>
+                        <h3 className="font-medium">{project.name}</h3>
+                        {project.description && (
+                          <p className="text-sm text-muted-foreground">{project.description}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {project.status !== 'completed' && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleStatusChange(
+                            project.id, 
+                            project.status === 'paused' ? 'active' : 'paused'
+                          )}
+                        >
+                          {project.status === 'paused' ? (
+                            <Play className="w-4 h-4 text-green-500" />
+                          ) : (
+                            <Pause className="w-4 h-4 text-yellow-500" />
+                          )}
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDelete(project.id)}
+                      >
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>{language === 'tr' ? 'İlerleme' : 'Progress'}</span>
+                      <span className="font-medium">{project.progress || 0}%</span>
+                    </div>
+                    <Progress value={project.progress || 0} className="h-2" />
+                  </div>
+
+                  {project.status !== 'completed' && (
+                    <div className="flex items-center gap-2 mt-3">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleUpdateProgress(project.id, (project.progress || 0) - 10)}
+                      >
+                        -10%
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleUpdateProgress(project.id, (project.progress || 0) + 10)}
+                      >
+                        +10%
+                      </Button>
+                      <Button
+                        variant="default"
+                        size="sm"
+                        className="ml-auto"
+                        onClick={() => handleStatusChange(project.id, 'completed')}
+                      >
+                        <CheckCircle className="w-4 h-4 mr-1" />
+                        {language === 'tr' ? 'Tamamla' : 'Complete'}
+                      </Button>
+                    </div>
+                  )}
+
+                  {project.due_date && (
+                    <div className="flex items-center gap-1 mt-3 text-xs text-muted-foreground">
+                      <Clock className="w-3 h-3" />
+                      {new Date(project.due_date).toLocaleDateString(language === 'tr' ? 'tr-TR' : 'en-US')}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+          ))
+        )}
       </div>
 
-      {filteredProjects.length === 0 && (
-        <div className="text-center py-12">
-          <FolderKanban className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
-          <p className="text-muted-foreground">
-            {filter === 'all' ? 'Henüz proje eklenmemiş' : 'Bu kategoride proje yok'}
-          </p>
-          {filter === 'all' && (
-            <Button className="mt-4" onClick={() => setShowAddModal(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              İlk Projenizi Ekleyin
-            </Button>
-          )}
-        </div>
-      )}
+      {/* Mobile FAB */}
+      <Button
+        onClick={() => setShowAddModal(true)}
+        className="fixed bottom-20 right-4 w-14 h-14 rounded-full shadow-lg md:hidden z-30"
+        size="icon"
+      >
+        <Plus className="w-6 h-6" />
+      </Button>
 
-      {/* Add project modal */}
+      {/* Add Modal */}
       <AnimatePresence>
         {showAddModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-            onClick={() => setShowAddModal(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-card border border-border rounded-2xl p-6 w-full max-w-md"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h2 className="text-xl font-bold mb-4">Yeni Proje</h2>
-              
-              <div className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Proje Adı</label>
-                  <Input
-                    value={newProject.name}
-                    onChange={(e) => setNewProject(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="örn: Kişisel Web Sitesi"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Açıklama (opsiyonel)</label>
-                  <Input
-                    value={newProject.description}
-                    onChange={(e) => setNewProject(prev => ({ ...prev, description: e.target.value }))}
-                    placeholder="Kısa açıklama..."
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Öncelik</label>
-                  <div className="flex gap-2">
-                    {PRIORITIES.map((p) => (
-                      <button
-                        key={p.id}
-                        onClick={() => setNewProject(prev => ({ ...prev, priority: p.id as Project['priority'] }))}
-                        className={cn(
-                          'flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all',
-                          newProject.priority === p.id 
-                            ? `${p.color} text-white` 
-                            : 'bg-secondary hover:bg-secondary/80'
-                        )}
-                      >
-                        {p.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Bitiş Tarihi</label>
-                  <Input
-                    type="date"
-                    value={newProject.deadline}
-                    onChange={(e) => setNewProject(prev => ({ ...prev, deadline: e.target.value }))}
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Renk</label>
-                  <div className="flex gap-2">
-                    {COLOR_OPTIONS.map((color) => (
-                      <button
-                        key={color}
-                        onClick={() => setNewProject(prev => ({ ...prev, color }))}
-                        className={cn(
-                          'w-8 h-8 rounded-full transition-all',
-                          newProject.color === color && 'ring-2 ring-offset-2 ring-offset-background ring-primary'
-                        )}
-                        style={{ backgroundColor: color }}
-                      />
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex gap-2 pt-4">
-                  <Button variant="outline" onClick={() => setShowAddModal(false)} className="flex-1">
-                    İptal
-                  </Button>
-                  <Button onClick={handleAddProject} className="flex-1">
-                    Ekle
-                  </Button>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
+          <AddProjectModal
+            onClose={() => setShowAddModal(false)}
+            onAdd={async (data) => {
+              const result = await addProject(data)
+              if (result) {
+                toast.success(language === 'tr' ? 'Proje eklendi' : 'Project added')
+                setShowAddModal(false)
+              }
+            }}
+            t={t}
+            language={language}
+          />
         )}
       </AnimatePresence>
     </div>
+  )
+}
+
+function AddProjectModal({
+  onClose,
+  onAdd,
+  t,
+  language,
+}: {
+  onClose: () => void
+  onAdd: (data: any) => void
+  t: any
+  language: string
+}) {
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
+  const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium')
+  const [dueDate, setDueDate] = useState('')
+  const [color, setColor] = useState(COLOR_OPTIONS[0])
+
+  const handleSubmit = () => {
+    if (!name.trim()) return
+    onAdd({
+      name,
+      description,
+      priority,
+      due_date: dueDate || undefined,
+      color,
+    })
+  }
+
+  return (
+    <>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 bg-black/50 z-50"
+        onClick={onClose}
+      />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        className="fixed inset-4 md:inset-auto md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-full md:max-w-md bg-card rounded-2xl shadow-xl z-50 flex flex-col max-h-[80vh]"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b shrink-0">
+          <h2 className="text-xl font-bold">{t.projects.add_new}</h2>
+          <Button variant="ghost" size="icon" onClick={onClose}>
+            <X className="w-5 h-5" />
+          </Button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          <div>
+            <label className="text-sm font-medium mb-2 block">{t.projects.project_name} *</label>
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder={language === 'tr' ? 'örn: Web Sitesi' : 'e.g., Website'}
+              autoFocus
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium mb-2 block">{t.projects.description}</label>
+            <Input
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder={language === 'tr' ? 'Açıklama (opsiyonel)' : 'Description (optional)'}
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium mb-2 block">{t.projects.priority}</label>
+            <div className="flex gap-2">
+              {PRIORITIES.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => setPriority(p.id as any)}
+                  className={cn(
+                    'flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all',
+                    priority === p.id
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted hover:bg-accent'
+                  )}
+                >
+                  {language === 'tr' ? p.label_tr : p.label_en}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium mb-2 block">{t.projects.due_date}</label>
+            <Input
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium mb-2 block">{t.projects.color}</label>
+            <div className="flex flex-wrap gap-2">
+              {COLOR_OPTIONS.map((c) => (
+                <button
+                  key={c}
+                  onClick={() => setColor(c)}
+                  className={cn(
+                    'w-10 h-10 rounded-full transition-all',
+                    color === c && 'ring-2 ring-offset-2 ring-offset-background ring-primary'
+                  )}
+                  style={{ backgroundColor: c }}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex gap-3 p-4 border-t shrink-0">
+          <Button variant="outline" className="flex-1" onClick={onClose}>
+            {t.cancel}
+          </Button>
+          <Button className="flex-1" onClick={handleSubmit} disabled={!name.trim()}>
+            {t.add}
+          </Button>
+        </div>
+      </motion.div>
+    </>
   )
 }

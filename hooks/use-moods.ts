@@ -1,110 +1,118 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useAuth } from './use-auth'
 import type { MoodEntry } from '@/types'
-import toast from 'react-hot-toast'
 
-export function useMoods(userId: string | undefined) {
+export function useMoods() {
+  const { user } = useAuth()
   const [moods, setMoods] = useState<MoodEntry[]>([])
-  const [todayMood, setTodayMood] = useState<1 | 2 | 3 | 4 | 5 | undefined>(undefined)
+  const [todayMood, setTodayMood] = useState<MoodEntry | null>(null)
   const [loading, setLoading] = useState(true)
   
   const supabase = useMemo(() => createClient(), [])
   const today = new Date().toISOString().split('T')[0]
 
   // Fetch moods
-  const fetchMoods = useCallback(async () => {
-    if (!userId) {
+  useEffect(() => {
+    if (!user?.id) {
+      setMoods([])
+      setTodayMood(null)
       setLoading(false)
       return
     }
 
-    try {
-      setLoading(true)
-      
-      // Get this week's moods
-      const weekAgo = new Date()
-      weekAgo.setDate(weekAgo.getDate() - 7)
-      const weekAgoStr = weekAgo.toISOString().split('T')[0]
+    const fetchMoods = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('mood_entries')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('date', { ascending: false })
+          .limit(30)
 
-      const { data } = await supabase
-        .from('mood_entries')
-        .select('*')
-        .eq('user_id', userId)
-        .gte('date', weekAgoStr)
-        .order('date', { ascending: true })
-
-      if (data) {
-        setMoods(data)
-        const todayEntry = data.find(m => m.date === today)
-        if (todayEntry) {
-          setTodayMood(todayEntry.value as 1 | 2 | 3 | 4 | 5)
-        }
+        if (error) throw error
+        
+        setMoods(data || [])
+        
+        // Find today's entry
+        const todayEntry = (data || []).find(m => m.date === today)
+        setTodayMood(todayEntry || null)
+      } catch (err) {
+        console.error('Error fetching moods:', err)
+      } finally {
+        setLoading(false)
       }
-
-    } catch (err) {
-      console.error('Error fetching moods:', err)
-    } finally {
-      setLoading(false)
     }
-  }, [userId, today, supabase])
 
-  useEffect(() => {
     fetchMoods()
-  }, [fetchMoods])
+  }, [user?.id, supabase, today])
 
-  // Save mood
-  const saveMood = async (mood: 1 | 2 | 3 | 4 | 5, note?: string) => {
-    if (!userId) return
+  // Add/update today's mood
+  const addMood = useCallback(async (value: 1 | 2 | 3 | 4 | 5, note?: string) => {
+    if (!user?.id) return false
+
+    const prevMood = todayMood
 
     // Optimistic update
-    setTodayMood(mood)
+    const newMood = {
+      user_id: user.id,
+      date: today,
+      value,
+      note: note || null,
+    } as MoodEntry
+    
+    setTodayMood(newMood)
 
     try {
       // Check if entry exists
       const { data: existing } = await supabase
         .from('mood_entries')
         .select('id')
-        .eq('user_id', userId)
+        .eq('user_id', user.id)
         .eq('date', today)
         .single()
 
       if (existing) {
         // Update
-        await supabase
+        const { error } = await supabase
           .from('mood_entries')
-          .update({ value: mood, note })
+          .update({ value, note: note || null })
           .eq('id', existing.id)
+
+        if (error) throw error
       } else {
         // Insert
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('mood_entries')
           .insert({
-            user_id: userId,
+            user_id: user.id,
             date: today,
-            value: mood,
-            note,
+            value,
+            note: note || null,
           })
           .select()
           .single()
 
-        if (data) {
-          setMoods(prev => [...prev.filter(m => m.date !== today), data])
-        }
+        if (error) throw error
+        setTodayMood(data)
+        setMoods(prev => [data, ...prev.filter(m => m.date !== today)])
       }
+
+      return true
     } catch (err) {
-      console.error('Error saving mood:', err)
-      toast.error('Kaydetme başarısız')
-      fetchMoods() // Rollback
+      // Rollback
+      setTodayMood(prevMood)
+      console.error('Error adding mood:', err)
+      return false
     }
-  }
+  }, [user?.id, supabase, today, todayMood])
 
   return {
     moods,
     todayMood,
     loading,
-    saveMood,
-    refetch: fetchMoods,
+    addMood,
   }
 }

@@ -1,462 +1,240 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Heart, Droplets, Moon, Flame, Footprints, Dumbbell, TrendingUp, Calendar, Plus, Minus } from 'lucide-react'
-import { cn, formatDate, getWeekDays } from '@/lib/utils'
+import { Heart, Droplets, Moon, Flame, Footprints, Dumbbell, TrendingUp, Calendar, Minus, Plus } from 'lucide-react'
+import { cn, formatDate } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { Progress } from '@/components/ui/progress'
 import { useHealth } from '@/hooks/use-health'
-import { useAuth } from '@/hooks/use-auth'
-import type { HealthEntry } from '@/types'
+import { useTranslation } from '@/hooks/use-translation'
+import toast from 'react-hot-toast'
+
+const METRICS = [
+  { key: 'water_liters', icon: Droplets, color: '#3B82F6', target: 2.5, unit: 'L', step: 0.25, max: 5 },
+  { key: 'sleep_hours', icon: Moon, color: '#8B5CF6', target: 8, unit: 'saat', unit_en: 'hrs', step: 0.5, max: 12 },
+  { key: 'exercise_minutes', icon: Dumbbell, color: '#22C55E', target: 60, unit: 'dk', unit_en: 'min', step: 5, max: 180 },
+  { key: 'calories', icon: Flame, color: '#F97316', target: 2000, unit: 'kcal', unit_en: 'kcal', step: 100, max: 4000 },
+  { key: 'steps', icon: Footprints, color: '#14B8A6', target: 10000, unit: '', unit_en: '', step: 500, max: 25000 },
+] as const
 
 export default function HealthPage() {
-  const { user } = useAuth()
-  const userId = user?.id
-  
-  const {
-    todayHealth,
-    weeklyHealth,
-    loading,
-    updateHealth,
-    waterScore,
-    sleepScore,
-    exerciseScore,
-    stepsScore,
-    overallScore,
-  } = useHealth(userId)
+  const { t, language } = useTranslation()
+  const { todayHealth, loading, adjustMetric, updateHealth } = useHealth()
+  const [mounted, setMounted] = useState(false)
 
-  const [selectedDate] = useState(new Date().toISOString().split('T')[0])
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
-  if (loading) {
+  // Calculate scores
+  const getScore = (key: string, value: number) => {
+    const metric = METRICS.find(m => m.key === key)
+    if (!metric) return 0
+    return Math.min(100, (value / metric.target) * 100)
+  }
+
+  const waterScore = getScore('water_liters', todayHealth?.water_liters || 0)
+  const sleepScore = getScore('sleep_hours', todayHealth?.sleep_hours || 0)
+  const exerciseScore = getScore('exercise_minutes', todayHealth?.exercise_minutes || 0)
+  const stepsScore = getScore('steps', todayHealth?.steps || 0)
+  const overallScore = Math.round((waterScore + sleepScore + exerciseScore + stepsScore) / 4)
+
+  const handleAdjust = async (key: typeof METRICS[number]['key'], amount: number) => {
+    const success = await adjustMetric(key, amount)
+    if (success && amount > 0) {
+      const metric = METRICS.find(m => m.key === key)
+      const newValue = (todayHealth?.[key] as number || 0) + amount
+      if (metric && newValue >= metric.target) {
+        toast.success('🎉 ' + (language === 'tr' ? 'Hedefe ulaştın!' : 'Goal reached!'))
+      }
+    }
+  }
+
+  if (!mounted || loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+      <div className="space-y-6 animate-pulse">
+        <div className="h-10 bg-muted rounded w-48" />
+        <div className="h-32 bg-muted rounded-xl" />
+        <div className="space-y-4">
+          {[1,2,3,4,5].map(i => <div key={i} className="h-24 bg-muted rounded-xl" />)}
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-20">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold">Sağlık Takibi</h1>
-          <p className="text-muted-foreground">Günlük sağlık verilerini takip et</p>
+          <h1 className="text-2xl md:text-3xl font-bold">{t.health_page.title}</h1>
+          <p className="text-muted-foreground">{t.health_page.subtitle}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Calendar className="w-4 h-4 text-muted-foreground" />
-          <span className="text-sm">{formatDate(selectedDate, 'EEEE, d MMMM yyyy')}</span>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Calendar className="w-4 h-4" />
+          {formatDate(new Date(), language === 'tr' ? 'EEEE, d MMMM' : 'EEEE, MMMM d')}
         </div>
       </div>
 
-      {/* Overall score */}
+      {/* Overall Score */}
       <Card className="bg-gradient-to-br from-primary/10 to-accent/10 border-primary/20">
         <CardContent className="pt-6">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="flex items-center gap-4">
-              <div className="relative">
-                <svg className="w-24 h-24 -rotate-90">
-                  <circle
-                    className="stroke-muted"
-                    strokeWidth="8"
-                    fill="transparent"
-                    r="40"
-                    cx="48"
-                    cy="48"
-                  />
-                  <circle
-                    className={cn(
-                      'transition-all duration-500',
-                      overallScore >= 80 ? 'stroke-green-500' :
-                      overallScore >= 60 ? 'stroke-primary' :
-                      overallScore >= 40 ? 'stroke-yellow-500' : 'stroke-red-500'
-                    )}
-                    strokeWidth="8"
-                    strokeLinecap="round"
-                    fill="transparent"
-                    r="40"
-                    cx="48"
-                    cy="48"
-                    style={{
-                      strokeDasharray: `${2 * Math.PI * 40}`,
-                      strokeDashoffset: `${2 * Math.PI * 40 * (1 - overallScore / 100)}`,
-                    }}
-                  />
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-2xl font-bold">{overallScore}</span>
-                </div>
-              </div>
-              <div>
-                <h2 className="text-xl font-bold">Günlük Sağlık Skoru</h2>
-                <p className="text-muted-foreground">
-                  {overallScore >= 80 ? 'Harika gidiyorsun! 🎉' :
-                   overallScore >= 60 ? 'İyi ilerleme! 💪' :
-                   overallScore >= 40 ? 'Biraz daha çaba gerekiyor 🎯' : 'Hedeflerine odaklan! 🔥'}
-                </p>
+          <div className="flex items-center gap-6">
+            <div className="relative">
+              <svg className="w-24 h-24 -rotate-90">
+                <circle
+                  className="stroke-secondary"
+                  strokeWidth="8"
+                  fill="transparent"
+                  r="40"
+                  cx="48"
+                  cy="48"
+                />
+                <circle
+                  className={cn(
+                    'transition-all duration-500',
+                    overallScore >= 80 ? 'stroke-green-500' :
+                    overallScore >= 60 ? 'stroke-primary' :
+                    overallScore >= 40 ? 'stroke-yellow-500' : 'stroke-red-500'
+                  )}
+                  strokeWidth="8"
+                  strokeLinecap="round"
+                  fill="transparent"
+                  r="40"
+                  cx="48"
+                  cy="48"
+                  style={{
+                    strokeDasharray: `${2 * Math.PI * 40}`,
+                    strokeDashoffset: `${2 * Math.PI * 40 * (1 - overallScore / 100)}`,
+                  }}
+                />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-2xl font-bold">{overallScore}%</span>
               </div>
             </div>
-
-            <div className="grid grid-cols-4 gap-4">
-              <MetricBadge icon={Droplets} value={Math.round(waterScore)} label="Su" color="#3B82F6" />
-              <MetricBadge icon={Moon} value={Math.round(sleepScore)} label="Uyku" color="#8B5CF6" />
-              <MetricBadge icon={Dumbbell} value={Math.round(exerciseScore)} label="Egzersiz" color="#22C55E" />
-              <MetricBadge icon={Footprints} value={Math.round(stepsScore)} label="Adım" color="#14B8A6" />
+            <div>
+              <h2 className="text-xl font-bold">{t.dashboard.health_score}</h2>
+              <p className="text-muted-foreground text-sm">
+                {overallScore >= 80 ? (language === 'tr' ? 'Mükemmel! 🎉' : 'Excellent! 🎉') :
+                 overallScore >= 60 ? (language === 'tr' ? 'İyi gidiyorsun!' : 'Doing well!') :
+                 overallScore >= 40 ? (language === 'tr' ? 'Daha iyisini yapabilirsin' : 'You can do better') :
+                 (language === 'tr' ? 'Bugün kendine bak' : 'Take care of yourself')}
+              </p>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Main tracking section */}
-      <div className="grid lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-4">
-          {/* Water */}
-          <HealthMetricCard
-            label="Su"
-            icon={Droplets}
-            value={todayHealth.water_liters || 0}
-            target={2.5}
-            unit="L"
-            color="#3B82F6"
-            step={0.25}
-            max={5}
-            decimals={1}
-            onChange={(value) => updateHealth({ water_liters: value })}
-          />
+      {/* Metrics */}
+      <div className="space-y-4">
+        {METRICS.map((metric) => {
+          const Icon = metric.icon
+          const value = (todayHealth?.[metric.key] as number) || 0
+          const percentage = Math.min(100, (value / metric.target) * 100)
+          const isComplete = percentage >= 100
+          const unit = language === 'tr' ? metric.unit : (metric.unit_en || metric.unit)
 
-          {/* Sleep */}
-          <HealthMetricCard
-            label="Uyku"
-            icon={Moon}
-            value={todayHealth.sleep_hours || 0}
-            target={8}
-            unit="saat"
-            color="#8B5CF6"
-            step={0.5}
-            max={12}
-            decimals={1}
-            onChange={(value) => updateHealth({ sleep_hours: value })}
-          />
+          return (
+            <motion.div
+              key={metric.key}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              <Card className={isComplete ? 'border-green-500/30 bg-green-500/5' : ''}>
+                <CardContent className="pt-4">
+                  <div className="flex items-center gap-4">
+                    <div
+                      className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
+                      style={{ backgroundColor: `${metric.color}20` }}
+                    >
+                      <Icon className="w-6 h-6" style={{ color: metric.color }} />
+                    </div>
 
-          {/* Exercise */}
-          <HealthMetricCard
-            label="Egzersiz"
-            icon={Dumbbell}
-            value={todayHealth.exercise_minutes || 0}
-            target={60}
-            unit="dk"
-            color="#22C55E"
-            step={5}
-            max={180}
-            decimals={0}
-            onChange={(value) => updateHealth({ exercise_minutes: value })}
-          />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-medium">
+                          {metric.key === 'water_liters' ? t.health_page.water_intake :
+                           metric.key === 'sleep_hours' ? t.health_page.sleep_hours :
+                           metric.key === 'exercise_minutes' ? t.health_page.exercise :
+                           metric.key === 'calories' ? t.health_page.calories :
+                           t.health_page.steps}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <span 
+                            className="text-lg font-bold"
+                            style={{ color: isComplete ? '#22C55E' : metric.color }}
+                          >
+                            {metric.key === 'water_liters' ? value.toFixed(1) : Math.round(value)}
+                          </span>
+                          <span className="text-sm text-muted-foreground">
+                            / {metric.target} {unit}
+                          </span>
+                        </div>
+                      </div>
 
-          {/* Steps */}
-          <HealthMetricCard
-            label="Adım"
-            icon={Footprints}
-            value={todayHealth.steps || 0}
-            target={10000}
-            unit=""
-            color="#14B8A6"
-            step={500}
-            max={30000}
-            decimals={0}
-            onChange={(value) => updateHealth({ steps: value })}
-          />
+                      <div className="flex items-center gap-3">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="w-10 h-10 shrink-0"
+                          onClick={() => handleAdjust(metric.key, -metric.step)}
+                          disabled={value <= 0}
+                        >
+                          <Minus className="w-4 h-4" />
+                        </Button>
 
-          {/* Calories */}
-          <HealthMetricCard
-            label="Kalori"
-            icon={Flame}
-            value={todayHealth.calories || 0}
-            target={2000}
-            unit="kcal"
-            color="#F97316"
-            step={100}
-            max={4000}
-            decimals={0}
-            onChange={(value) => updateHealth({ calories: value })}
-          />
-        </div>
+                        <div className="flex-1">
+                          <Progress
+                            value={percentage}
+                            className="h-3"
+                            style={{ 
+                              '--progress-background': `${metric.color}20`,
+                              '--progress-foreground': isComplete ? '#22C55E' : metric.color 
+                            } as React.CSSProperties}
+                          />
+                        </div>
 
-        <div className="space-y-6">
-          {/* Weight tracking */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg">Kilo Takibi</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <Input
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      max="300"
-                      value={todayHealth.weight || ''}
-                      onChange={(e) => {
-                        const val = parseFloat(e.target.value)
-                        if (!isNaN(val) && val >= 0) {
-                          updateHealth({ weight: val })
-                        }
-                      }}
-                      className="text-2xl font-bold w-24 h-12 text-center"
-                      placeholder="0"
-                    />
-                    <span className="text-muted-foreground text-lg">kg</span>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="w-10 h-10 shrink-0"
+                          onClick={() => handleAdjust(metric.key, metric.step)}
+                          disabled={value >= metric.max}
+                        >
+                          <Plus className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
                   </div>
-                  <p className="text-sm text-muted-foreground mt-2">Güncel kilo</p>
-                </div>
-                <div className="flex flex-col gap-2">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => updateHealth({ weight: Math.round(((todayHealth.weight || 0) + 0.1) * 10) / 10 })}
-                  >
-                    <Plus className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => updateHealth({ weight: Math.max(0, Math.round(((todayHealth.weight || 0) - 0.1) * 10) / 10) })}
-                  >
-                    <Minus className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )
+        })}
+      </div>
 
-          {/* Quick tips */}
-          <Card className="bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border-blue-500/20">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex items-center gap-2">
-                💡 Günün İpucu
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm">
-                {waterScore < 50 
-                  ? 'Su içmeyi unutma! Her saat başı bir bardak su iç.' 
-                  : sleepScore < 50 
-                  ? 'Uyku düzenine dikkat et. 7-8 saat uyumayı hedefle.'
-                  : exerciseScore < 50
-                  ? 'Bugün biraz hareket et! 30 dakika yürüyüş bile fark yaratır.'
-                  : 'Harika gidiyorsun! Böyle devam et! 🌟'}
-              </p>
-            </CardContent>
-          </Card>
-
-          {/* Weekly summary */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-primary" />
-                Bu Hafta
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <WeeklyStatRow
-                  label="Ortalama Su"
-                  value={calculateWeeklyAvg(weeklyHealth, 'water_liters')}
-                  unit="L"
-                  target={2.5}
-                />
-                <WeeklyStatRow
-                  label="Ortalama Uyku"
-                  value={calculateWeeklyAvg(weeklyHealth, 'sleep_hours')}
-                  unit="saat"
-                  target={8}
-                />
-                <WeeklyStatRow
-                  label="Toplam Egzersiz"
-                  value={calculateWeeklyTotal(weeklyHealth, 'exercise_minutes')}
-                  unit="dk"
-                  target={420}
-                />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+      {/* Quick Stats */}
+      <div className="grid grid-cols-2 gap-4">
+        <Card>
+          <CardContent className="pt-4 text-center">
+            <p className="text-3xl font-bold text-blue-500">
+              {(todayHealth?.water_liters || 0).toFixed(1)}L
+            </p>
+            <p className="text-xs text-muted-foreground">{t.health_page.water_intake}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 text-center">
+            <p className="text-3xl font-bold text-purple-500">
+              {(todayHealth?.sleep_hours || 0).toFixed(1)}h
+            </p>
+            <p className="text-xs text-muted-foreground">{t.health_page.sleep_hours}</p>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )
-}
-
-// Health Metric Card Component
-function HealthMetricCard({
-  label,
-  icon: Icon,
-  value,
-  target,
-  unit,
-  color,
-  step,
-  max,
-  decimals,
-  onChange,
-}: {
-  label: string
-  icon: React.ElementType
-  value: number
-  target: number
-  unit: string
-  color: string
-  step: number
-  max: number
-  decimals: number
-  onChange: (value: number) => void
-}) {
-  const percentage = Math.min(100, (value / target) * 100)
-  const isComplete = percentage >= 100
-
-  const formatValue = (v: number) => {
-    return decimals > 0 ? v.toFixed(decimals) : Math.round(v)
-  }
-
-  return (
-    <Card>
-      <CardContent className="py-4">
-        <div className="flex items-center gap-4">
-          <div
-            className="flex items-center justify-center w-12 h-12 rounded-xl shrink-0"
-            style={{ backgroundColor: `${color}20` }}
-          >
-            <Icon className="w-6 h-6" style={{ color }} />
-          </div>
-
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between mb-2">
-              <span className="font-medium">{label}</span>
-              <div className="flex items-center gap-2">
-                <Input
-                  type="number"
-                  step={step}
-                  min={0}
-                  max={max}
-                  value={value || ''}
-                  onChange={(e) => {
-                    const val = parseFloat(e.target.value)
-                    if (!isNaN(val) && val >= 0 && val <= max) {
-                      onChange(val)
-                    }
-                  }}
-                  className="w-20 h-8 text-center font-bold"
-                  style={{ color: isComplete ? '#22C55E' : color }}
-                />
-                <span className="text-sm text-muted-foreground">
-                  / {formatValue(target)} {unit}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-8 w-8 shrink-0"
-                onClick={() => onChange(Math.max(0, value - step))}
-              >
-                <Minus className="w-4 h-4" />
-              </Button>
-
-              <div className="flex-1 h-3 bg-secondary rounded-full overflow-hidden">
-                <motion.div
-                  className="h-full rounded-full transition-all duration-300"
-                  style={{ 
-                    backgroundColor: isComplete ? '#22C55E' : color,
-                    width: `${percentage}%` 
-                  }}
-                  initial={{ width: 0 }}
-                  animate={{ width: `${percentage}%` }}
-                />
-              </div>
-
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-8 w-8 shrink-0"
-                onClick={() => onChange(Math.min(max, value + step))}
-              >
-                <Plus className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-// Metric Badge
-function MetricBadge({ 
-  icon: Icon, 
-  value, 
-  label, 
-  color 
-}: { 
-  icon: React.ElementType
-  value: number
-  label: string
-  color: string
-}) {
-  return (
-    <div className="text-center">
-      <div 
-        className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-1"
-        style={{ backgroundColor: `${color}20` }}
-      >
-        <Icon className="w-5 h-5" style={{ color }} />
-      </div>
-      <p className="text-lg font-bold">{value}%</p>
-      <p className="text-xs text-muted-foreground">{label}</p>
-    </div>
-  )
-}
-
-// Weekly stat row
-function WeeklyStatRow({
-  label,
-  value,
-  unit,
-  target,
-}: {
-  label: string
-  value: number
-  unit: string
-  target: number
-}) {
-  const percentage = Math.min(100, (value / target) * 100)
-  
-  return (
-    <div>
-      <div className="flex items-center justify-between text-sm mb-1">
-        <span className="text-muted-foreground">{label}</span>
-        <span className="font-medium">{value.toFixed(1)} {unit}</span>
-      </div>
-      <div className="h-2 bg-secondary rounded-full overflow-hidden">
-        <div 
-          className="h-full bg-primary rounded-full transition-all"
-          style={{ width: `${percentage}%` }}
-        />
-      </div>
-    </div>
-  )
-}
-
-// Helper functions
-function calculateWeeklyAvg(data: Partial<HealthEntry>[], key: keyof HealthEntry): number {
-  if (data.length === 0) return 0
-  const sum = data.reduce((acc, d) => acc + (Number(d[key]) || 0), 0)
-  return sum / data.length
-}
-
-function calculateWeeklyTotal(data: Partial<HealthEntry>[], key: keyof HealthEntry): number {
-  return data.reduce((acc, d) => acc + (Number(d[key]) || 0), 0)
 }

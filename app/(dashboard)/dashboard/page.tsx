@@ -16,92 +16,169 @@ import { cn, formatDate, getWeekDays } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { StatCard } from '@/components/dashboard/stat-card'
-import { HabitCard, HabitCardMini } from '@/components/habits/habit-card'
 import { MoodSelector, MoodWeekView } from '@/components/mood/mood-selector'
 import { HealthSummaryCard } from '@/components/health/health-tracker'
 import { GoalCard, GoalsSummary } from '@/components/goals/goal-card'
-import { WeeklyChart, MoodTrendChart } from '@/components/charts/weekly-chart'
 import { useAppStore } from '@/lib/store'
+import { useHabitsWithStatus } from '@/hooks/use-habits'
+import { useAuth } from '@/hooks/use-auth'
+import { createClient } from '@/lib/supabase/client'
 import type { Habit, Goal, MoodEntry, HealthEntry } from '@/types'
-
-// Demo data for initial state
-const DEMO_HABITS: (Habit & { completedToday: boolean })[] = [
-  { id: '1', user_id: '1', name: 'Sabah meditasyonu', description: null, icon: '🧘', color: '#8B5CF6', frequency: 'daily', target_days: [], reminder_time: '07:00', streak: 12, best_streak: 15, created_at: '', updated_at: '', archived: false, completedToday: true },
-  { id: '2', user_id: '1', name: '30 dk egzersiz', description: null, icon: '💪', color: '#22C55E', frequency: 'daily', target_days: [], reminder_time: '08:00', streak: 5, best_streak: 20, created_at: '', updated_at: '', archived: false, completedToday: false },
-  { id: '3', user_id: '1', name: '2.5L su iç', description: null, icon: '💧', color: '#3B82F6', frequency: 'daily', target_days: [], reminder_time: null, streak: 8, best_streak: 30, created_at: '', updated_at: '', archived: false, completedToday: true },
-  { id: '4', user_id: '1', name: '30 dk okuma', description: null, icon: '📚', color: '#F97316', frequency: 'daily', target_days: [], reminder_time: '21:00', streak: 3, best_streak: 10, created_at: '', updated_at: '', archived: false, completedToday: false },
-]
-
-const DEMO_GOALS: Goal[] = [
-  { id: '1', user_id: '1', title: '10 kg ver', name: '10 kg ver', description: 'Sağlıklı kilo hedefi', target_value: 10, current_value: 4, unit: 'kg', deadline: '2025-06-01', category: 'health', status: 'active', created_at: '', updated_at: '' },
-  { id: '2', user_id: '1', title: '50 kitap oku', name: '50 kitap oku', description: 'Yıllık okuma hedefi', target_value: 50, current_value: 18, unit: 'kitap', deadline: '2025-12-31', category: 'education', status: 'active', created_at: '', updated_at: '' },
-]
-
-const DEMO_MOODS: MoodEntry[] = [
-  { id: '1', user_id: '1', date: getWeekDays()[0].toISOString().split('T')[0], value: 4, note: null, tags: [], energy_level: null, stress_level: null, created_at: '' },
-  { id: '2', user_id: '1', date: getWeekDays()[1].toISOString().split('T')[0], value: 3, note: null, tags: [], energy_level: null, stress_level: null, created_at: '' },
-  { id: '3', user_id: '1', date: getWeekDays()[2].toISOString().split('T')[0], value: 5, note: null, tags: [], energy_level: null, stress_level: null, created_at: '' },
-  { id: '4', user_id: '1', date: getWeekDays()[3].toISOString().split('T')[0], value: 4, note: null, tags: [], energy_level: null, stress_level: null, created_at: '' },
-  { id: '5', user_id: '1', date: getWeekDays()[4].toISOString().split('T')[0], value: 3, note: null, tags: [], energy_level: null, stress_level: null, created_at: '' },
-  { id: '6', user_id: '1', date: getWeekDays()[5].toISOString().split('T')[0], value: 5, note: null, tags: [], energy_level: null, stress_level: null, created_at: '' },
-]
-
-const DEMO_HEALTH: Partial<HealthEntry> = {
-  water_liters: 1.5,
-  sleep_hours: 7,
-  exercise_minutes: 30,
-  calories: 1800,
-  steps: 6500,
-}
-
-const DEMO_WEEKLY_DATA = getWeekDays().map((date, i) => ({
-  date: date.toISOString().split('T')[0],
-  productivity: 60 + Math.random() * 30,
-  health: 50 + Math.random() * 40,
-  mood: 40 + Math.random() * 50,
-}))
+import confetti from 'canvas-confetti'
 
 export default function DashboardPage() {
-  const [habits, setHabits] = useState(DEMO_HABITS)
-  const [goals] = useState(DEMO_GOALS)
-  const [moods, setMoods] = useState(DEMO_MOODS)
-  const [health, setHealth] = useState(DEMO_HEALTH)
+  const { user } = useAuth()
+  const userId = user?.id
+
+  // Real data from Supabase
+  const { habits, completedCount, totalCount, toggleHabit, addHabit } = useHabitsWithStatus(userId)
+  
+  const [goals, setGoals] = useState<Goal[]>([])
+  const [moods, setMoods] = useState<MoodEntry[]>([])
+  const [health, setHealth] = useState<Partial<HealthEntry>>({})
   const [todayMood, setTodayMood] = useState<1 | 2 | 3 | 4 | 5 | undefined>(undefined)
+  const [loading, setLoading] = useState(true)
 
   const today = new Date()
+  const todayStr = today.toISOString().split('T')[0]
   const greeting = getGreeting()
 
+  // Fetch goals, moods, health from Supabase
+  useEffect(() => {
+    if (!userId) {
+      setLoading(false)
+      return
+    }
+
+    const fetchData = async () => {
+      const supabase = createClient()
+      
+      try {
+        // Fetch goals
+        const { data: goalsData } = await supabase
+          .from('goals')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('status', 'active')
+          .limit(3)
+
+        if (goalsData) setGoals(goalsData)
+
+        // Fetch this week's moods
+        const weekStart = getWeekDays()[0].toISOString().split('T')[0]
+        const { data: moodsData } = await supabase
+          .from('mood_entries')
+          .select('*')
+          .eq('user_id', userId)
+          .gte('date', weekStart)
+          .order('date', { ascending: true })
+
+        if (moodsData) {
+          setMoods(moodsData)
+          const todayMoodEntry = moodsData.find(m => m.date === todayStr)
+          if (todayMoodEntry) {
+            setTodayMood(todayMoodEntry.value as 1 | 2 | 3 | 4 | 5)
+          }
+        }
+
+        // Fetch today's health entry
+        const { data: healthData } = await supabase
+          .from('health_entries')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('date', todayStr)
+          .single()
+
+        if (healthData) setHealth(healthData)
+
+      } catch (err) {
+        console.error('Error fetching dashboard data:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [userId, todayStr])
+
   // Calculate scores
-  const completedHabits = habits.filter(h => h.completedToday).length
-  const totalHabits = habits.length
-  const productivityScore = totalHabits > 0 ? Math.round((completedHabits / totalHabits) * 100) : 0
+  const productivityScore = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
   const healthScore = calculateHealthScore(health)
   const moodScore = todayMood ? todayMood * 20 : 60
   const overallScore = Math.round((productivityScore + healthScore + moodScore) / 3)
 
-  const handleHabitToggle = (id: string) => {
-    setHabits(prev => prev.map(h => 
-      h.id === id ? { ...h, completedToday: !h.completedToday, streak: !h.completedToday ? h.streak + 1 : h.streak - 1 } : h
-    ))
+  // Handle habit toggle with confetti
+  const handleHabitToggle = async (habitId: string, isCompleted: boolean) => {
+    if (!isCompleted) {
+      confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 }
+      })
+    }
+    await toggleHabit(habitId)
   }
 
-  const handleMoodChange = (mood: 1 | 2 | 3 | 4 | 5) => {
+  // Handle mood change
+  const handleMoodChange = async (mood: 1 | 2 | 3 | 4 | 5) => {
+    if (!userId) return
+    
     setTodayMood(mood)
-    const todayStr = today.toISOString().split('T')[0]
-    setMoods(prev => {
-      const filtered = prev.filter(m => m.date !== todayStr)
-      return [...filtered, { 
-        id: Date.now().toString(), 
-        user_id: '1', 
-        date: todayStr, 
-        value: mood, 
-        note: null, 
-        tags: [], 
-        energy_level: null, 
-        stress_level: null, 
-        created_at: '' 
-      }]
-    })
+    
+    const supabase = createClient()
+    
+    try {
+      // Check if mood entry exists for today
+      const { data: existing } = await supabase
+        .from('mood_entries')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('date', todayStr)
+        .single()
+
+      if (existing) {
+        // Update existing
+        await supabase
+          .from('mood_entries')
+          .update({ value: mood })
+          .eq('id', existing.id)
+      } else {
+        // Create new
+        await supabase
+          .from('mood_entries')
+          .insert({
+            user_id: userId,
+            date: todayStr,
+            value: mood,
+          })
+      }
+
+      // Update local state
+      setMoods(prev => {
+        const filtered = prev.filter(m => m.date !== todayStr)
+        return [...filtered, { 
+          id: existing?.id || Date.now().toString(), 
+          user_id: userId, 
+          date: todayStr, 
+          value: mood, 
+          note: null, 
+          tags: [], 
+          energy_level: null, 
+          stress_level: null, 
+          created_at: new Date().toISOString() 
+        }]
+      })
+    } catch (err) {
+      console.error('Error saving mood:', err)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+      </div>
+    )
   }
 
   return (
@@ -144,7 +221,7 @@ export default function DashboardPage() {
           title="Verimlilik"
           value={productivityScore}
           icon="⚡"
-          subtitle={`${completedHabits}/${totalHabits} alışkanlık`}
+          subtitle={`${completedCount}/${totalCount} alışkanlık`}
         />
         <StatCard
           title="Sağlık"
@@ -163,118 +240,160 @@ export default function DashboardPage() {
       </div>
 
       {/* Main content grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left column - Habits & Mood */}
+      <div className="grid lg:grid-cols-3 gap-6">
+        {/* Left column - Habits */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Habits section */}
+          {/* Today's Habits */}
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="flex items-center gap-2">
-                <Target className="w-5 h-5 text-primary" />
-                Bugünkü Alışkanlıklar
-              </CardTitle>
-              <Link href="/habits">
-                <Button variant="ghost" size="sm">
-                  Tümü <ChevronRight className="w-4 h-4 ml-1" />
-                </Button>
-              </Link>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Target className="w-5 h-5 text-primary" />
+                  Bugünkü Alışkanlıklar
+                </CardTitle>
+                <Link href="/habits" className="text-sm text-muted-foreground hover:text-primary flex items-center">
+                  Tümü <ChevronRight className="w-4 h-4" />
+                </Link>
+              </div>
             </CardHeader>
             <CardContent className="space-y-3">
-              {habits.map((habit) => (
-                <HabitCard
-                  key={habit.id}
-                  id={habit.id}
-                  name={habit.name}
-                  icon={habit.icon}
-                  color={habit.color}
-                  streak={habit.streak}
-                  completed={habit.completedToday}
-                  onToggle={handleHabitToggle}
-                />
-              ))}
-              <Button variant="outline" className="w-full mt-2" asChild>
-                <Link href="/habits/new">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Yeni Alışkanlık Ekle
-                </Link>
-              </Button>
+              {habits.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Target className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                  <p>Henüz alışkanlık eklemedin</p>
+                  <Button variant="outline" size="sm" className="mt-3" asChild>
+                    <Link href="/habits">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Alışkanlık Ekle
+                    </Link>
+                  </Button>
+                </div>
+              ) : (
+                habits.slice(0, 4).map((habit) => (
+                  <motion.div
+                    key={habit.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={cn(
+                      'flex items-center gap-4 p-3 rounded-xl border transition-all',
+                      habit.completedToday 
+                        ? 'bg-green-500/10 border-green-500/30' 
+                        : 'hover:bg-accent/50'
+                    )}
+                  >
+                    <button
+                      onClick={() => handleHabitToggle(habit.id, habit.completedToday)}
+                      className={cn(
+                        'w-8 h-8 rounded-lg border-2 flex items-center justify-center transition-all shrink-0',
+                        habit.completedToday 
+                          ? 'bg-green-500 border-green-500 text-white' 
+                          : 'border-muted-foreground/30 hover:border-primary'
+                      )}
+                    >
+                      {habit.completedToday && <span className="text-sm">✓</span>}
+                    </button>
+                    <div 
+                      className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0"
+                      style={{ backgroundColor: `${habit.color}20` }}
+                    >
+                      {habit.icon}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className={cn(
+                        'font-medium truncate',
+                        habit.completedToday && 'line-through text-muted-foreground'
+                      )}>
+                        {habit.name}
+                      </h4>
+                      {habit.streak > 0 && (
+                        <span className="inline-flex items-center gap-1 text-xs text-orange-500">
+                          <Flame className="w-3 h-3" />
+                          {habit.streak} gün seri
+                        </span>
+                      )}
+                    </div>
+                  </motion.div>
+                ))
+              )}
+              
+              {/* Add habit inline */}
+              <Link 
+                href="/habits"
+                className="flex items-center justify-center gap-2 p-3 rounded-xl border border-dashed border-muted-foreground/30 text-muted-foreground hover:text-foreground hover:border-primary transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                Yeni Alışkanlık Ekle
+              </Link>
             </CardContent>
           </Card>
 
-          {/* Weekly chart */}
-          <WeeklyChart data={DEMO_WEEKLY_DATA} />
+          {/* Goals Summary */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-primary" />
+                  Hedefler
+                </CardTitle>
+                <Link href="/goals" className="text-sm text-muted-foreground hover:text-primary flex items-center">
+                  Tümü <ChevronRight className="w-4 h-4" />
+                </Link>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {goals.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <TrendingUp className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                  <p>Henüz hedef eklemedin</p>
+                  <Button variant="outline" size="sm" className="mt-3" asChild>
+                    <Link href="/goals">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Hedef Ekle
+                    </Link>
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {goals.map((goal) => (
+                    <GoalCard key={goal.id} goal={goal} compact />
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
-        {/* Right column - Mood, Health, Goals */}
+        {/* Right column - Mood & Health */}
         <div className="space-y-6">
-          {/* Mood section */}
+          {/* Mood */}
           <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg">Bugün Nasıl Hissediyorsun?</CardTitle>
+            <CardHeader className="pb-3">
+              <CardTitle>Bugün Nasıl Hissediyorsun?</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <MoodSelector
-                value={todayMood}
+            <CardContent>
+              <MoodSelector 
+                value={todayMood} 
                 onChange={handleMoodChange}
-                showLabels
-                size="lg"
               />
-              <div className="pt-2 border-t border-border">
+              <div className="mt-4">
                 <p className="text-sm text-muted-foreground mb-2">Bu hafta</p>
-                <MoodWeekView moods={moods.map(m => ({ date: m.date, value: m.value }))} />
+                <MoodWeekView moods={moods} />
               </div>
             </CardContent>
           </Card>
 
-          {/* Health section */}
-          <HealthSummaryCard data={health} />
-
-          {/* Goals section */}
+          {/* Health Summary */}
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <TrendingUp className="w-5 h-5 text-primary" />
-                Hedefler
-              </CardTitle>
-              <Link href="/goals">
-                <Button variant="ghost" size="sm">
-                  Tümü <ChevronRight className="w-4 h-4 ml-1" />
-                </Button>
-              </Link>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-primary" />
+                  Sağlık Skoru
+                </CardTitle>
+              </div>
             </CardHeader>
-            <CardContent className="space-y-3">
-              {goals.slice(0, 2).map((goal) => (
-                <GoalCard key={goal.id} goal={goal} compact />
-              ))}
-            </CardContent>
-          </Card>
-
-          {/* Streak highlights */}
-          <Card className="bg-gradient-to-br from-orange-500/10 to-amber-500/10 border-orange-500/30">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 rounded-xl bg-orange-500/20 flex items-center justify-center">
-                  <Flame className="w-6 h-6 text-orange-500" />
-                </div>
-                <div>
-                  <h3 className="font-semibold">En Uzun Seri</h3>
-                  <p className="text-sm text-muted-foreground">Devam ettir!</p>
-                </div>
-              </div>
-              <div className="space-y-2">
-                {habits
-                  .sort((a, b) => b.streak - a.streak)
-                  .slice(0, 3)
-                  .map((habit) => (
-                    <div key={habit.id} className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span>{habit.icon}</span>
-                        <span className="text-sm">{habit.name}</span>
-                      </div>
-                      <span className="streak-badge">{habit.streak} gün</span>
-                    </div>
-                  ))}
-              </div>
+            <CardContent>
+              <HealthSummaryCard health={health} score={healthScore} />
             </CardContent>
           </Card>
         </div>
@@ -283,30 +402,30 @@ export default function DashboardPage() {
   )
 }
 
-function getGreeting(): string {
+// Helper functions
+function getGreeting() {
   const hour = new Date().getHours()
-  if (hour < 6) return 'İyi Geceler 🌙'
-  if (hour < 12) return 'Günaydın ☀️'
+  if (hour < 12) return 'Günaydın 👋'
   if (hour < 18) return 'İyi Günler 👋'
-  return 'İyi Akşamlar 🌆'
+  return 'İyi Akşamlar 👋'
 }
 
-function calculateHealthScore(health: Partial<HealthEntry>): number {
-  let score = 0
-  let count = 0
-
+function calculateHealthScore(health: Partial<HealthEntry>) {
+  let score = 50 // Base score
+  
   if (health.water_liters) {
-    score += Math.min(100, (health.water_liters / 2.5) * 100)
-    count++
+    score += Math.min(health.water_liters / 2.5, 1) * 15
   }
   if (health.sleep_hours) {
-    score += Math.min(100, (health.sleep_hours / 8) * 100)
-    count++
+    const sleepScore = health.sleep_hours >= 7 && health.sleep_hours <= 9 ? 1 : 0.5
+    score += sleepScore * 15
   }
   if (health.exercise_minutes) {
-    score += Math.min(100, (health.exercise_minutes / 60) * 100)
-    count++
+    score += Math.min(health.exercise_minutes / 30, 1) * 10
+  }
+  if (health.steps) {
+    score += Math.min(health.steps / 10000, 1) * 10
   }
 
-  return count > 0 ? Math.round(score / count) : 0
+  return Math.min(Math.round(score), 100)
 }

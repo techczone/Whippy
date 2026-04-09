@@ -21,7 +21,6 @@ import { MoodSelector, MoodWeekView } from '@/components/mood/mood-selector'
 import { HealthSummaryCard } from '@/components/health/health-tracker'
 import { GoalCard } from '@/components/goals/goal-card'
 import { WeeklyChart } from '@/components/charts/weekly-chart'
-import { useAppStore } from '@/lib/store'
 import { useTranslation } from '@/hooks/use-translation'
 import { useAuth } from '@/hooks/use-auth'
 import { useHabits } from '@/hooks/use-habits'
@@ -33,21 +32,36 @@ import type { HealthEntry } from '@/types'
 export default function DashboardPage() {
   const { t, language } = useTranslation()
   const { user } = useAuth()
-  const { habits, toggleHabit, todayLogs } = useHabits()
-  const { goals } = useGoals()
-  const { moods, addMood, todayMood } = useMoods()
+  const { habits = [], toggleHabit, todayLogs = [] } = useHabits()
+  const { goals = [] } = useGoals()
+  const { moods = [], addMood, todayMood } = useMoods()
   const { todayHealth } = useHealth()
   
-  const [selectedMood, setSelectedMood] = useState<1 | 2 | 3 | 4 | 5 | undefined>(
-    todayMood?.value as 1 | 2 | 3 | 4 | 5 | undefined
-  )
+  const [mounted, setMounted] = useState(false)
+  const [selectedMood, setSelectedMood] = useState<1 | 2 | 3 | 4 | 5 | undefined>(undefined)
+
+  // Handle hydration
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // Set mood from data
+  useEffect(() => {
+    if (todayMood?.value) {
+      setSelectedMood(todayMood.value as 1 | 2 | 3 | 4 | 5)
+    }
+  }, [todayMood])
 
   const today = new Date()
   const greeting = getGreeting(language)
 
+  // Safe array operations with defaults
+  const activeHabits = habits?.filter(h => !h.archived) || []
+  const activeGoals = goals?.filter(g => g.status === 'active') || []
+
   // Calculate scores
-  const completedHabits = todayLogs.length
-  const totalHabits = habits.filter(h => !h.archived).length
+  const completedHabits = todayLogs?.length || 0
+  const totalHabits = activeHabits.length
   const productivityScore = totalHabits > 0 ? Math.round((completedHabits / totalHabits) * 100) : 0
   const healthScore = calculateHealthScore(todayHealth)
   const moodScore = selectedMood ? selectedMood * 20 : 60
@@ -72,8 +86,27 @@ export default function DashboardPage() {
     }))
   }, [])
 
-  const activeHabits = habits.filter(h => !h.archived)
-  const activeGoals = goals.filter(g => g.status === 'active')
+  // Prevent hydration mismatch
+  if (!mounted) {
+    return (
+      <div className="space-y-6 animate-pulse">
+        <div className="h-10 bg-muted rounded w-48" />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[1,2,3,4].map(i => <div key={i} className="h-24 bg-muted rounded-xl" />)}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-6">
+            <div className="h-64 bg-muted rounded-xl" />
+            <div className="h-48 bg-muted rounded-xl" />
+          </div>
+          <div className="space-y-6">
+            <div className="h-40 bg-muted rounded-xl" />
+            <div className="h-40 bg-muted rounded-xl" />
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -158,7 +191,7 @@ export default function DashboardPage() {
                 </div>
               ) : (
                 activeHabits.slice(0, 4).map((habit) => {
-                  const isCompleted = todayLogs.some(log => log.habit_id === habit.id)
+                  const isCompleted = todayLogs?.some(log => log.habit_id === habit.id) || false
                   return (
                     <HabitCard
                       key={habit.id}
@@ -185,7 +218,7 @@ export default function DashboardPage() {
           {/* Weekly chart */}
           <Card>
             <CardHeader>
-              <CardTitle>{t.dashboard.weekly_performance}</CardTitle>
+              <CardTitle>{t.dashboard.weekly_performance || 'Weekly Performance'}</CardTitle>
             </CardHeader>
             <CardContent>
               <WeeklyChart data={weeklyData} />
@@ -209,7 +242,7 @@ export default function DashboardPage() {
               />
               <div className="pt-2 border-t border-border">
                 <p className="text-sm text-muted-foreground mb-2">{t.dashboard.this_week}</p>
-                <MoodWeekView moods={moods.slice(-7).map(m => ({ date: m.date, value: m.value }))} />
+                <MoodWeekView moods={(moods || []).slice(-7).map(m => ({ date: m.date, value: m.value }))} />
               </div>
             </CardContent>
           </Card>
@@ -258,20 +291,26 @@ export default function DashboardPage() {
                 </div>
               </div>
               <div className="space-y-2">
-                {activeHabits
-                  .sort((a, b) => b.streak - a.streak)
-                  .slice(0, 3)
-                  .map((habit) => (
-                    <div key={habit.id} className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span>{habit.icon}</span>
-                        <span className="text-sm">{habit.name}</span>
+                {activeHabits.length > 0 ? (
+                  [...activeHabits]
+                    .sort((a, b) => (b.streak || 0) - (a.streak || 0))
+                    .slice(0, 3)
+                    .map((habit) => (
+                      <div key={habit.id} className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span>{habit.icon}</span>
+                          <span className="text-sm">{habit.name}</span>
+                        </div>
+                        <span className="streak-badge">
+                          {habit.streak || 0} {t.habits.days}
+                        </span>
                       </div>
-                      <span className="streak-badge">
-                        {habit.streak} {t.habits.days}
-                      </span>
-                    </div>
-                  ))}
+                    ))
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-2">
+                    {language === 'tr' ? 'Henüz seri yok' : 'No streaks yet'}
+                  </p>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -296,7 +335,7 @@ function getGreeting(lang: string): string {
   }
 }
 
-function calculateHealthScore(health: Partial<HealthEntry> | null): number {
+function calculateHealthScore(health: Partial<HealthEntry> | null | undefined): number {
   if (!health) return 0
   
   let score = 0

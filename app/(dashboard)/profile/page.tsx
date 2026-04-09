@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { 
   User, 
@@ -13,21 +13,15 @@ import {
   TrendingUp,
   Edit2,
   Save,
-  X
+  X,
+  LogOut
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Progress } from '@/components/ui/progress'
-
-// Demo user data
-const demoUser = {
-  name: 'Cem',
-  email: 'cem@example.com',
-  avatar: null,
-  joinDate: '2024-01-15',
-  tier: 'free' as const,
-}
+import { useAuth } from '@/hooks/use-auth'
+import { useRouter } from 'next/navigation'
 
 const demoStats = {
   totalHabitsCompleted: 234,
@@ -48,9 +42,19 @@ const demoAchievements = [
 ]
 
 export default function ProfilePage() {
+  const { user, profile, subscription, signOut, loading } = useAuth()
+  const router = useRouter()
   const [isEditing, setIsEditing] = useState(false)
-  const [name, setName] = useState(demoUser.name)
-  const [tempName, setTempName] = useState(demoUser.name)
+  const [name, setName] = useState('')
+  const [tempName, setTempName] = useState('')
+
+  useEffect(() => {
+    if (user) {
+      const displayName = user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || 'Kullanıcı'
+      setName(displayName)
+      setTempName(displayName)
+    }
+  }, [user])
 
   const handleSave = () => {
     setName(tempName)
@@ -62,18 +66,43 @@ export default function ProfilePage() {
     setIsEditing(false)
   }
 
+  const handleSignOut = async () => {
+    await signOut()
+    router.push('/login')
+  }
+
   const unlockedCount = demoAchievements.filter(a => a.unlocked).length
   const totalAchievements = demoAchievements.length
+
+  // Get user info
+  const userEmail = user?.email || 'email@example.com'
+  const userAvatar = user?.user_metadata?.avatar_url || user?.user_metadata?.picture || null
+  const userTier = subscription?.tier || 'free'
+  const joinDate = user?.created_at ? new Date(user.created_at).toLocaleDateString('tr-TR', { year: 'numeric', month: 'long', day: 'numeric' }) : ''
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <User className="w-7 h-7 text-primary" />
-          Profil
-        </h1>
-        <p className="text-muted-foreground">Hesap bilgilerin ve başarıların</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <User className="w-7 h-7 text-primary" />
+            Profil
+          </h1>
+          <p className="text-muted-foreground">Hesap bilgilerin ve başarıların</p>
+        </div>
+        <Button variant="outline" onClick={handleSignOut} className="text-red-500 hover:text-red-600">
+          <LogOut className="w-4 h-4 mr-2" />
+          Çıkış Yap
+        </Button>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
@@ -83,62 +112,73 @@ export default function ProfilePage() {
             <div className="flex flex-col items-center text-center">
               {/* Avatar */}
               <div className="relative mb-4">
-                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-4xl text-white font-bold">
-                  {name.charAt(0).toUpperCase()}
+                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center text-white text-3xl font-bold overflow-hidden">
+                  {userAvatar ? (
+                    <img src={userAvatar} alt={name} className="w-full h-full object-cover" />
+                  ) : (
+                    name.charAt(0).toUpperCase()
+                  )}
                 </div>
-                <button className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-secondary border-2 border-background flex items-center justify-center hover:bg-accent transition-colors">
+                <button className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-card border border-border flex items-center justify-center hover:bg-accent transition-colors">
                   <Camera className="w-4 h-4" />
                 </button>
               </div>
 
               {/* Name */}
-              {isEditing ? (
-                <div className="flex items-center gap-2 mb-2">
-                  <Input
-                    value={tempName}
-                    onChange={(e) => setTempName(e.target.value)}
-                    className="text-center"
-                  />
-                  <Button size="icon" variant="ghost" onClick={handleSave}>
-                    <Save className="w-4 h-4 text-green-500" />
-                  </Button>
-                  <Button size="icon" variant="ghost" onClick={handleCancel}>
-                    <X className="w-4 h-4 text-red-500" />
-                  </Button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 mb-2">
-                  <h2 className="text-xl font-bold">{name}</h2>
-                  <button onClick={() => setIsEditing(true)}>
-                    <Edit2 className="w-4 h-4 text-muted-foreground hover:text-foreground" />
-                  </button>
+              <div className="flex items-center gap-2 mb-1">
+                {isEditing ? (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={tempName}
+                      onChange={(e) => setTempName(e.target.value)}
+                      className="h-8 w-40 text-center"
+                    />
+                    <button onClick={handleSave} className="text-green-500 hover:text-green-600">
+                      <Save className="w-4 h-4" />
+                    </button>
+                    <button onClick={handleCancel} className="text-red-500 hover:text-red-600">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <h2 className="text-xl font-semibold">{name}</h2>
+                    <button onClick={() => setIsEditing(true)} className="text-muted-foreground hover:text-foreground">
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                  </>
+                )}
+              </div>
+
+              {/* Email */}
+              <div className="flex items-center gap-1 text-muted-foreground text-sm mb-3">
+                <Mail className="w-4 h-4" />
+                {userEmail}
+              </div>
+
+              {/* Tier Badge */}
+              <div className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium mb-3 ${
+                userTier === 'elite' 
+                  ? 'bg-purple-500/10 text-purple-500 border border-purple-500/20'
+                  : userTier === 'pro'
+                  ? 'bg-orange-500/10 text-orange-500 border border-orange-500/20'
+                  : 'bg-muted text-muted-foreground'
+              }`}>
+                {userTier === 'elite' ? '👑' : userTier === 'pro' ? '⭐' : '🆓'}
+                {userTier === 'elite' ? 'Elite Plan' : userTier === 'pro' ? 'Pro Plan' : 'Ücretsiz Plan'}
+              </div>
+
+              {/* Join Date */}
+              {joinDate && (
+                <div className="flex items-center gap-1 text-muted-foreground text-xs">
+                  <Calendar className="w-3 h-3" />
+                  {joinDate} tarihinde katıldı
                 </div>
               )}
 
-              {/* Email */}
-              <p className="text-sm text-muted-foreground flex items-center gap-1 mb-4">
-                <Mail className="w-4 h-4" />
-                {demoUser.email}
-              </p>
-
-              {/* Tier Badge */}
-<div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-secondary text-sm font-medium mb-4">
-  {demoUser.tier === 'free' ? '🆓 Ücretsiz Plan' : demoUser.tier === 'pro' ? '⭐ Pro Plan' : '👑 Elite Plan'}
-</div>
-
-              {/* Join Date */}
-              <p className="text-xs text-muted-foreground flex items-center gap-1">
-                <Calendar className="w-3 h-3" />
-                {new Date(demoUser.joinDate).toLocaleDateString('tr-TR', { 
-                  year: 'numeric', 
-                  month: 'long', 
-                  day: 'numeric' 
-                })} tarihinde katıldı
-              </p>
-
               {/* Upgrade Button */}
-              {demoUser.tier === 'free' && (
-                <Button className="w-full mt-6 bg-gradient-to-r from-primary to-accent">
+              {userTier === 'free' && (
+                <Button className="w-full mt-4 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600">
                   Pro'ya Yükselt
                 </Button>
               )}
@@ -146,138 +186,124 @@ export default function ProfilePage() {
           </CardContent>
         </Card>
 
-        {/* Stats & Achievements */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Stats Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-            >
-              <Card>
-                <CardContent className="pt-4 text-center">
-                  <Target className="w-8 h-8 mx-auto mb-2 text-primary" />
-                  <p className="text-2xl font-bold">{demoStats.totalHabitsCompleted}</p>
-                  <p className="text-xs text-muted-foreground">Tamamlanan Alışkanlık</p>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-            >
-              <Card>
-                <CardContent className="pt-4 text-center">
-                  <Flame className="w-8 h-8 mx-auto mb-2 text-orange-500" />
-                  <p className="text-2xl font-bold">{demoStats.currentStreak}</p>
-                  <p className="text-xs text-muted-foreground">Güncel Seri</p>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-            >
-              <Card>
-                <CardContent className="pt-4 text-center">
-                  <Trophy className="w-8 h-8 mx-auto mb-2 text-yellow-500" />
-                  <p className="text-2xl font-bold">{demoStats.longestStreak}</p>
-                  <p className="text-xs text-muted-foreground">En Uzun Seri</p>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
-            >
-              <Card>
-                <CardContent className="pt-4 text-center">
-                  <TrendingUp className="w-8 h-8 mx-auto mb-2 text-green-500" />
-                  <p className="text-2xl font-bold">{demoStats.goalsCompleted}</p>
-                  <p className="text-xs text-muted-foreground">Tamamlanan Hedef</p>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5 }}
-            >
-              <Card>
-                <CardContent className="pt-4 text-center">
-                  <Calendar className="w-8 h-8 mx-auto mb-2 text-blue-500" />
-                  <p className="text-2xl font-bold">{demoStats.totalDaysActive}</p>
-                  <p className="text-xs text-muted-foreground">Aktif Gün</p>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.6 }}
-            >
-              <Card>
-                <CardContent className="pt-4 text-center">
-                  <div className="w-8 h-8 mx-auto mb-2 rounded-full bg-gradient-to-r from-primary to-accent flex items-center justify-center text-white font-bold text-sm">
-                    %
-                  </div>
-                  <p className="text-2xl font-bold">{demoStats.averageScore}</p>
-                  <p className="text-xs text-muted-foreground">Ortalama Skor</p>
-                </CardContent>
-              </Card>
-            </motion.div>
-          </div>
-
-          {/* Achievements */}
+        {/* Stats Grid */}
+        <div className="lg:col-span-2 grid sm:grid-cols-3 gap-4">
           <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <Trophy className="w-5 h-5 text-yellow-500" />
-                  Başarılar
-                </CardTitle>
-                <span className="text-sm text-muted-foreground">
-                  {unlockedCount}/{totalAchievements}
-                </span>
+            <CardContent className="pt-6">
+              <div className="flex flex-col items-center text-center">
+                <div className="w-12 h-12 rounded-xl bg-orange-500/10 flex items-center justify-center mb-3">
+                  <Target className="w-6 h-6 text-orange-500" />
+                </div>
+                <div className="text-3xl font-bold">{demoStats.totalHabitsCompleted}</div>
+                <div className="text-sm text-muted-foreground">Tamamlanan Alışkanlık</div>
               </div>
-              <Progress value={(unlockedCount / totalAchievements) * 100} className="h-2" />
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                {demoAchievements.map((achievement) => (
-                  <motion.div
-                    key={achievement.id}
-                    whileHover={{ scale: 1.02 }}
-                    className={`p-3 rounded-xl border ${
-                      achievement.unlocked 
-                        ? 'bg-secondary/50 border-primary/30' 
-                        : 'bg-secondary/20 border-border opacity-50'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-2xl">{achievement.icon}</span>
-                      <span className="font-medium text-sm">{achievement.name}</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">{achievement.description}</p>
-                    {achievement.unlocked && (
-                      <span className="text-xs text-green-500 mt-1 block">✓ Kazanıldı</span>
-                    )}
-                  </motion.div>
-                ))}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex flex-col items-center text-center">
+                <div className="w-12 h-12 rounded-xl bg-red-500/10 flex items-center justify-center mb-3">
+                  <Flame className="w-6 h-6 text-red-500" />
+                </div>
+                <div className="text-3xl font-bold">{demoStats.currentStreak}</div>
+                <div className="text-sm text-muted-foreground">Güncel Seri</div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex flex-col items-center text-center">
+                <div className="w-12 h-12 rounded-xl bg-yellow-500/10 flex items-center justify-center mb-3">
+                  <Trophy className="w-6 h-6 text-yellow-500" />
+                </div>
+                <div className="text-3xl font-bold">{demoStats.longestStreak}</div>
+                <div className="text-sm text-muted-foreground">En Uzun Seri</div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex flex-col items-center text-center">
+                <div className="w-12 h-12 rounded-xl bg-green-500/10 flex items-center justify-center mb-3">
+                  <TrendingUp className="w-6 h-6 text-green-500" />
+                </div>
+                <div className="text-3xl font-bold">{demoStats.goalsCompleted}</div>
+                <div className="text-sm text-muted-foreground">Tamamlanan Hedef</div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex flex-col items-center text-center">
+                <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center mb-3">
+                  <Calendar className="w-6 h-6 text-blue-500" />
+                </div>
+                <div className="text-3xl font-bold">{demoStats.totalDaysActive}</div>
+                <div className="text-sm text-muted-foreground">Aktif Gün</div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex flex-col items-center text-center">
+                <div className="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center mb-3">
+                  <div className="text-purple-500 font-bold">%</div>
+                </div>
+                <div className="text-3xl font-bold">{demoStats.averageScore}</div>
+                <div className="text-sm text-muted-foreground">Ortalama Skor</div>
               </div>
             </CardContent>
           </Card>
         </div>
       </div>
+
+      {/* Achievements */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Trophy className="w-5 h-5 text-yellow-500" />
+              Başarılar
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              <Progress value={(unlockedCount / totalAchievements) * 100} className="w-32 h-2" />
+              <span className="text-sm text-muted-foreground">{unlockedCount}/{totalAchievements}</span>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {demoAchievements.map((achievement) => (
+              <motion.div
+                key={achievement.id}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className={`p-4 rounded-xl border ${
+                  achievement.unlocked 
+                    ? 'bg-card border-orange-500/20' 
+                    : 'bg-muted/30 border-border opacity-50'
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <div className="text-2xl">{achievement.icon}</div>
+                  <div>
+                    <h4 className="font-medium">{achievement.name}</h4>
+                    <p className="text-xs text-muted-foreground">{achievement.description}</p>
+                    {achievement.unlocked && (
+                      <span className="text-xs text-green-500">✓ Kazanıldı</span>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

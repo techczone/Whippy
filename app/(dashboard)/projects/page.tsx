@@ -16,9 +16,9 @@ import toast from 'react-hot-toast'
 const COLOR_OPTIONS = ['#8B5CF6', '#3B82F6', '#22C55E', '#F97316', '#EC4899', '#14B8A6', '#EAB308', '#EF4444']
 
 const PRIORITIES = [
-  { id: 'low', label_tr: 'Düşük', label_en: 'Low', color: 'bg-blue-500' },
-  { id: 'medium', label_tr: 'Orta', label_en: 'Medium', color: 'bg-yellow-500' },
-  { id: 'high', label_tr: 'Yüksek', label_en: 'High', color: 'bg-red-500' },
+  { id: 'low', label_tr: 'Düşük', label_en: 'Low' },
+  { id: 'medium', label_tr: 'Orta', label_en: 'Medium' },
+  { id: 'high', label_tr: 'Yüksek', label_en: 'High' },
 ]
 
 export default function ProjectsPage() {
@@ -32,7 +32,6 @@ export default function ProjectsPage() {
     setMounted(true)
   }, [])
 
-  // Safe array operations
   const safeProjects = projects || []
 
   const filteredProjects = safeProjects.filter(p => {
@@ -55,47 +54,29 @@ export default function ProjectsPage() {
       status, 
       progress: status === 'completed' ? 100 : undefined 
     })
-    toast.success(language === 'tr' ? 'Durum güncellendi' : 'Status updated')
+    toast.success(language === 'tr' ? 'Güncellendi' : 'Updated')
   }
 
   const handleDelete = async (id: string) => {
     if (confirm(t.messages?.delete_confirm || 'Silmek istediğine emin misin?')) {
       await deleteProject(id)
-      toast.success(language === 'tr' ? 'Proje silindi' : 'Project deleted')
+      toast.success(language === 'tr' ? 'Silindi' : 'Deleted')
     }
   }
 
-  // Prevent hydration mismatch
-  if (!mounted) {
+  if (!mounted || loading) {
     return (
       <div className="space-y-6 animate-pulse">
         <div className="h-10 bg-muted rounded w-48" />
         <div className="grid grid-cols-3 gap-4">
           {[1,2,3].map(i => <div key={i} className="h-20 bg-muted rounded-xl" />)}
-        </div>
-        <div className="space-y-4">
-          {[1,2,3].map(i => <div key={i} className="h-32 bg-muted rounded-xl" />)}
-        </div>
-      </div>
-    )
-  }
-
-  if (loading) {
-    return (
-      <div className="space-y-6 animate-pulse">
-        <div className="h-10 bg-muted rounded w-48" />
-        <div className="grid grid-cols-3 gap-4">
-          {[1,2,3].map(i => <div key={i} className="h-20 bg-muted rounded-xl" />)}
-        </div>
-        <div className="space-y-4">
-          {[1,2,3].map(i => <div key={i} className="h-32 bg-muted rounded-xl" />)}
         </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6 pb-20">
+    <div className="space-y-6 pb-24">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
@@ -155,7 +136,6 @@ export default function ProjectsPage() {
             <CardContent className="py-12 text-center">
               <FolderKanban className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
               <h3 className="font-medium mb-2">{t.projects?.no_projects || 'Henüz proje yok'}</h3>
-              <p className="text-sm text-muted-foreground mb-4">{t.projects?.create_first || 'İlk projenizi oluşturun'}</p>
               <Button onClick={() => setShowAddModal(true)}>
                 <Plus className="w-4 h-4 mr-2" />
                 {t.projects?.add_new || 'Yeni Proje'}
@@ -164,11 +144,7 @@ export default function ProjectsPage() {
           </Card>
         ) : (
           filteredProjects.map((project) => (
-            <motion.div
-              key={project.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
+            <motion.div key={project.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
               <Card className={cn(
                 project.status === 'completed' && 'border-green-500/30 bg-green-500/5',
                 project.status === 'paused' && 'border-yellow-500/30 bg-yellow-500/5'
@@ -176,39 +152,19 @@ export default function ProjectsPage() {
                 <CardContent className="pt-4">
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-3">
-                      <div 
-                        className="w-3 h-3 rounded-full shrink-0"
-                        style={{ backgroundColor: project.color }}
-                      />
+                      <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: project.color }} />
                       <div>
                         <h3 className="font-medium">{project.name}</h3>
-                        {project.description && (
-                          <p className="text-sm text-muted-foreground">{project.description}</p>
-                        )}
+                        {project.description && <p className="text-sm text-muted-foreground">{project.description}</p>}
                       </div>
                     </div>
                     <div className="flex items-center gap-1">
                       {project.status !== 'completed' && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleStatusChange(
-                            project.id, 
-                            project.status === 'paused' ? 'active' : 'paused'
-                          )}
-                        >
-                          {project.status === 'paused' ? (
-                            <Play className="w-4 h-4 text-green-500" />
-                          ) : (
-                            <Pause className="w-4 h-4 text-yellow-500" />
-                          )}
+                        <Button variant="ghost" size="icon" onClick={() => handleStatusChange(project.id, project.status === 'paused' ? 'active' : 'paused')}>
+                          {project.status === 'paused' ? <Play className="w-4 h-4 text-green-500" /> : <Pause className="w-4 h-4 text-yellow-500" />}
                         </Button>
                       )}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDelete(project.id)}
-                      >
+                      <Button variant="ghost" size="icon" onClick={() => handleDelete(project.id)}>
                         <Trash2 className="w-4 h-4 text-destructive" />
                       </Button>
                     </div>
@@ -224,36 +180,12 @@ export default function ProjectsPage() {
 
                   {project.status !== 'completed' && (
                     <div className="flex items-center gap-2 mt-3">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleUpdateProgress(project.id, (project.progress || 0) - 10)}
-                      >
-                        -10%
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleUpdateProgress(project.id, (project.progress || 0) + 10)}
-                      >
-                        +10%
-                      </Button>
-                      <Button
-                        variant="default"
-                        size="sm"
-                        className="ml-auto"
-                        onClick={() => handleStatusChange(project.id, 'completed')}
-                      >
+                      <Button variant="outline" size="sm" onClick={() => handleUpdateProgress(project.id, (project.progress || 0) - 10)}>-10%</Button>
+                      <Button variant="outline" size="sm" onClick={() => handleUpdateProgress(project.id, (project.progress || 0) + 10)}>+10%</Button>
+                      <Button variant="default" size="sm" className="ml-auto" onClick={() => handleStatusChange(project.id, 'completed')}>
                         <CheckCircle className="w-4 h-4 mr-1" />
-                        {language === 'tr' ? 'Tamamla' : 'Complete'}
+                        {language === 'tr' ? 'Tamamla' : 'Done'}
                       </Button>
-                    </div>
-                  )}
-
-                  {project.due_date && (
-                    <div className="flex items-center gap-1 mt-3 text-xs text-muted-foreground">
-                      <Clock className="w-3 h-3" />
-                      {new Date(project.due_date).toLocaleDateString(language === 'tr' ? 'tr-TR' : 'en-US')}
                     </div>
                   )}
                 </CardContent>
@@ -264,11 +196,7 @@ export default function ProjectsPage() {
       </div>
 
       {/* Mobile FAB */}
-      <Button
-        onClick={() => setShowAddModal(true)}
-        className="fixed bottom-20 right-4 w-14 h-14 rounded-full shadow-lg md:hidden z-30"
-        size="icon"
-      >
+      <Button onClick={() => setShowAddModal(true)} className="fixed bottom-20 right-4 w-14 h-14 rounded-full shadow-lg md:hidden z-30" size="icon">
         <Plus className="w-6 h-6" />
       </Button>
 
@@ -280,7 +208,7 @@ export default function ProjectsPage() {
             onAdd={async (data) => {
               const result = await addProject(data)
               if (result) {
-                toast.success(language === 'tr' ? 'Proje eklendi' : 'Project added')
+                toast.success(language === 'tr' ? 'Eklendi' : 'Added')
                 setShowAddModal(false)
               }
             }}
@@ -293,17 +221,7 @@ export default function ProjectsPage() {
   )
 }
 
-function AddProjectModal({
-  onClose,
-  onAdd,
-  t,
-  language,
-}: {
-  onClose: () => void
-  onAdd: (data: any) => void
-  t: any
-  language: string
-}) {
+function AddProjectModal({ onClose, onAdd, t, language }: { onClose: () => void; onAdd: (data: any) => void; t: any; language: string }) {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium')
@@ -314,74 +232,35 @@ function AddProjectModal({
   const handleSubmit = async () => {
     if (!name.trim() || submitting) return
     setSubmitting(true)
-    await onAdd({
-      name,
-      description,
-      priority,
-      due_date: dueDate || undefined,
-      color,
-    })
+    await onAdd({ name, description, priority, due_date: dueDate || undefined, color })
     setSubmitting(false)
   }
 
   return (
     <>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/50 z-50" onClick={onClose} />
       <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/50 z-50"
-        onClick={onClose}
-      />
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        className="fixed inset-4 md:inset-auto md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-full md:max-w-md bg-card rounded-2xl shadow-xl z-50 flex flex-col max-h-[80vh]"
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="fixed left-4 right-4 top-1/2 -translate-y-1/2 md:left-1/2 md:right-auto md:-translate-x-1/2 md:w-full md:max-w-md bg-card rounded-2xl shadow-xl z-50 max-h-[70vh] flex flex-col"
       >
-        {/* Header */}
         <div className="flex items-center justify-between p-4 border-b shrink-0">
-          <h2 className="text-xl font-bold">{t.projects?.add_new || 'Yeni Proje'}</h2>
-          <Button variant="ghost" size="icon" onClick={onClose}>
-            <X className="w-5 h-5" />
-          </Button>
+          <h2 className="text-lg font-bold">{t.projects?.add_new || 'Yeni Proje'}</h2>
+          <Button variant="ghost" size="icon" onClick={onClose}><X className="w-5 h-5" /></Button>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div className="flex-1 overflow-y-auto p-4 space-y-3">
           <div>
-            <label className="text-sm font-medium mb-2 block">{t.projects?.project_name || 'Proje Adı'} *</label>
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder={language === 'tr' ? 'örn: Web Sitesi' : 'e.g., Website'}
-              autoFocus
-            />
+            <label className="text-sm font-medium mb-1 block">{t.projects?.project_name || 'Proje Adı'} *</label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={language === 'tr' ? 'örn: Web Sitesi' : 'e.g., Website'} autoFocus />
           </div>
 
           <div>
-            <label className="text-sm font-medium mb-2 block">{t.projects?.description || 'Açıklama'}</label>
-            <Input
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder={language === 'tr' ? 'Açıklama (opsiyonel)' : 'Description (optional)'}
-            />
-          </div>
-
-          <div>
-            <label className="text-sm font-medium mb-2 block">{t.projects?.priority || 'Öncelik'}</label>
+            <label className="text-sm font-medium mb-1 block">{t.projects?.priority || 'Öncelik'}</label>
             <div className="flex gap-2">
               {PRIORITIES.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => setPriority(p.id as any)}
-                  className={cn(
-                    'flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all',
-                    priority === p.id
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted hover:bg-accent'
-                  )}
-                >
+                <button key={p.id} onClick={() => setPriority(p.id as any)} className={cn('flex-1 px-3 py-1.5 rounded-lg text-sm font-medium', priority === p.id ? 'bg-primary text-primary-foreground' : 'bg-muted hover:bg-accent')}>
                   {language === 'tr' ? p.label_tr : p.label_en}
                 </button>
               ))}
@@ -389,44 +268,23 @@ function AddProjectModal({
           </div>
 
           <div>
-            <label className="text-sm font-medium mb-2 block">{t.projects?.due_date || 'Bitiş Tarihi'}</label>
-            <Input
-              type="date"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-            />
+            <label className="text-sm font-medium mb-1 block">{t.projects?.due_date || 'Bitiş'}</label>
+            <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
           </div>
 
           <div>
-            <label className="text-sm font-medium mb-2 block">{t.projects?.color || 'Renk'}</label>
+            <label className="text-sm font-medium mb-1 block">{t.projects?.color || 'Renk'}</label>
             <div className="flex flex-wrap gap-2">
               {COLOR_OPTIONS.map((c) => (
-                <button
-                  key={c}
-                  onClick={() => setColor(c)}
-                  className={cn(
-                    'w-10 h-10 rounded-full transition-all',
-                    color === c && 'ring-2 ring-offset-2 ring-offset-background ring-primary'
-                  )}
-                  style={{ backgroundColor: c }}
-                />
+                <button key={c} onClick={() => setColor(c)} className={cn('w-8 h-8 rounded-full', color === c && 'ring-2 ring-offset-2 ring-primary')} style={{ backgroundColor: c }} />
               ))}
             </div>
           </div>
         </div>
 
-        {/* Footer */}
         <div className="flex gap-3 p-4 border-t shrink-0">
-          <Button variant="outline" className="flex-1" onClick={onClose}>
-            {t.cancel || 'İptal'}
-          </Button>
-          <Button 
-            className="flex-1" 
-            onClick={handleSubmit} 
-            disabled={!name.trim() || submitting}
-          >
-            {submitting ? (language === 'tr' ? 'Ekleniyor...' : 'Adding...') : (t.add || 'Ekle')}
-          </Button>
+          <Button variant="outline" className="flex-1" onClick={onClose}>{t.cancel || 'İptal'}</Button>
+          <Button className="flex-1" onClick={handleSubmit} disabled={!name.trim() || submitting}>{submitting ? '...' : (t.add || 'Ekle')}</Button>
         </div>
       </motion.div>
     </>

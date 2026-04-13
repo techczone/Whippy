@@ -24,7 +24,6 @@ export default function HabitsPage() {
     setMounted(true)
   }, [])
 
-  // Safe array operations
   const safeHabits = habits || []
   const safeTodayLogs = todayLogs || []
   
@@ -52,16 +51,12 @@ export default function HabitsPage() {
     }
   }
 
-  // Prevent hydration mismatch
   if (!mounted) {
     return (
       <div className="space-y-6 animate-pulse">
         <div className="h-10 bg-muted rounded w-48" />
         <div className="grid grid-cols-3 gap-4">
           {[1,2,3].map(i => <div key={i} className="h-20 bg-muted rounded-xl" />)}
-        </div>
-        <div className="space-y-3">
-          {[1,2,3,4].map(i => <div key={i} className="h-20 bg-muted rounded-xl" />)}
         </div>
       </div>
     )
@@ -74,15 +69,12 @@ export default function HabitsPage() {
         <div className="grid grid-cols-3 gap-4">
           {[1,2,3].map(i => <div key={i} className="h-20 bg-muted rounded-xl" />)}
         </div>
-        <div className="space-y-3">
-          {[1,2,3,4].map(i => <div key={i} className="h-20 bg-muted rounded-xl" />)}
-        </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6 pb-20">
+    <div className="space-y-6 pb-24">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
@@ -156,7 +148,6 @@ export default function HabitsPage() {
                   )}>
                     <CardContent className="py-4">
                       <div className="flex items-center gap-4">
-                        {/* Checkbox */}
                         <button
                           onClick={() => handleToggle(habit.id)}
                           className={cn(
@@ -169,7 +160,6 @@ export default function HabitsPage() {
                           {isCompleted && <Check className="w-5 h-5" />}
                         </button>
 
-                        {/* Icon */}
                         <div 
                           className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0"
                           style={{ backgroundColor: `${habit.color}20` }}
@@ -177,7 +167,6 @@ export default function HabitsPage() {
                           {habit.icon}
                         </div>
 
-                        {/* Info */}
                         <div className="flex-1 min-w-0">
                           <h3 className={cn(
                             'font-medium truncate',
@@ -193,7 +182,6 @@ export default function HabitsPage() {
                           )}
                         </div>
 
-                        {/* Delete */}
                         <button
                           onClick={() => handleDelete(habit.id)}
                           className="p-2 text-muted-foreground hover:text-red-500 transition-colors shrink-0"
@@ -274,12 +262,12 @@ function AddHabitModal({
         onClick={onClose}
       />
 
-      {/* Modal */}
+      {/* Modal - centered properly */}
       <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        className="fixed inset-4 md:inset-auto md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-full md:max-w-md bg-card rounded-2xl shadow-xl z-50 flex flex-col max-h-[80vh]"
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="fixed left-4 right-4 top-1/2 -translate-y-1/2 md:left-1/2 md:right-auto md:-translate-x-1/2 md:w-full md:max-w-md bg-card rounded-2xl shadow-xl z-50 max-h-[70vh] flex flex-col"
       >
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b shrink-0">
@@ -310,7 +298,7 @@ function AddHabitModal({
                   type="button"
                   onClick={() => setIcon(i)}
                   className={cn(
-                    'w-10 h-10 rounded-lg text-xl flex items-center justify-center transition-all',
+                    'w-9 h-9 rounded-lg text-lg flex items-center justify-center transition-all',
                     icon === i ? 'bg-primary/20 ring-2 ring-primary' : 'bg-secondary hover:bg-secondary/80'
                   )}
                 >
@@ -329,7 +317,7 @@ function AddHabitModal({
                   type="button"
                   onClick={() => setColor(c)}
                   className={cn(
-                    'w-10 h-10 rounded-full transition-all',
+                    'w-9 h-9 rounded-full transition-all',
                     color === c && 'ring-2 ring-offset-2 ring-offset-background ring-primary'
                   )}
                   style={{ backgroundColor: c }}
@@ -345,7 +333,7 @@ function AddHabitModal({
             {t.cancel || 'İptal'}
           </Button>
           <Button className="flex-1" onClick={handleSubmit} disabled={!name.trim() || loading}>
-            {loading ? (language === 'tr' ? 'Ekleniyor...' : 'Adding...') : (t.add || 'Ekle')}
+            {loading ? '...' : (t.add || 'Ekle')}
           </Button>
         </div>
       </motion.div>

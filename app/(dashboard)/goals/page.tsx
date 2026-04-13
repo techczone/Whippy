@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, Target, TrendingUp, CheckCircle, Clock, X, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -25,48 +25,58 @@ const CATEGORIES: { id: GoalCategory; label_tr: string; label_en: string }[] = [
 
 export default function GoalsPage() {
   const { t, language } = useTranslation()
-  const { goals, loading, addGoal, updateGoal, deleteGoal, updateProgress } = useGoals()
+  const { goals = [], loading, addGoal, deleteGoal, updateProgress } = useGoals()
   const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all')
   const [showAddModal, setShowAddModal] = useState(false)
+  const [mounted, setMounted] = useState(false)
 
-  const filteredGoals = goals.filter(g => {
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  const safeGoals = goals || []
+
+  const filteredGoals = safeGoals.filter(g => {
     if (filter === 'active') return g.status === 'active'
     if (filter === 'completed') return g.status === 'completed'
     return true
   })
 
-  const activeCount = goals.filter(g => g.status === 'active').length
-  const completedCount = goals.filter(g => g.status === 'completed').length
-  const avgProgress = goals.length > 0 
-    ? Math.round(goals.reduce((acc, g) => acc + (g.current_value / g.target_value) * 100, 0) / goals.length)
+  const activeCount = safeGoals.filter(g => g.status === 'active').length
+  const completedCount = safeGoals.filter(g => g.status === 'completed').length
+  const avgProgress = safeGoals.length > 0 
+    ? Math.round(safeGoals.reduce((acc, g) => acc + ((g.current_value || 0) / (g.target_value || 1)) * 100, 0) / safeGoals.length)
     : 0
 
   const handleDelete = async (id: string) => {
-    if (confirm(t.messages.delete_confirm)) {
+    if (confirm(t.messages?.delete_confirm || 'Silmek istediğine emin misin?')) {
       const success = await deleteGoal(id)
-      if (success) toast.success(t.goals.goal_deleted)
+      if (success) toast.success(t.goals?.goal_deleted || 'Hedef silindi')
     }
   }
 
-  if (loading) {
+  if (!mounted || loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <div className="space-y-6 animate-pulse">
+        <div className="h-10 bg-muted rounded w-48" />
+        <div className="grid grid-cols-3 gap-4">
+          {[1,2,3].map(i => <div key={i} className="h-20 bg-muted rounded-xl" />)}
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6 pb-20">
+    <div className="space-y-6 pb-24">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold">{t.goals.title}</h1>
-          <p className="text-muted-foreground">{t.goals.subtitle}</p>
+          <h1 className="text-2xl md:text-3xl font-bold">{t.goals?.title || 'Hedefler'}</h1>
+          <p className="text-muted-foreground">{t.goals?.subtitle || 'Hedeflerini takip et'}</p>
         </div>
         <Button onClick={() => setShowAddModal(true)}>
           <Plus className="w-4 h-4 mr-2" />
-          {t.goals.add_new}
+          {t.goals?.add_new || 'Yeni Hedef'}
         </Button>
       </div>
 
@@ -75,19 +85,19 @@ export default function GoalsPage() {
         <Card>
           <CardContent className="pt-4 text-center">
             <p className="text-2xl font-bold text-primary">{activeCount}</p>
-            <p className="text-xs text-muted-foreground">{t.goals.active}</p>
+            <p className="text-xs text-muted-foreground">{t.goals?.active || 'Aktif'}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4 text-center">
             <p className="text-2xl font-bold text-green-500">{completedCount}</p>
-            <p className="text-xs text-muted-foreground">{t.goals.completed}</p>
+            <p className="text-xs text-muted-foreground">{t.goals?.completed || 'Tamamlandı'}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4 text-center">
             <p className="text-2xl font-bold text-orange-500">{avgProgress}%</p>
-            <p className="text-xs text-muted-foreground">{language === 'tr' ? 'Ort. İlerleme' : 'Avg. Progress'}</p>
+            <p className="text-xs text-muted-foreground">{language === 'tr' ? 'Ort.' : 'Avg.'}</p>
           </CardContent>
         </Card>
       </div>
@@ -101,7 +111,7 @@ export default function GoalsPage() {
             size="sm"
             onClick={() => setFilter(f)}
           >
-            {f === 'all' ? t.all : f === 'active' ? t.goals.active : t.goals.completed}
+            {f === 'all' ? (t.all || 'Tümü') : f === 'active' ? (t.goals?.active || 'Aktif') : (t.goals?.completed || 'Tamamlandı')}
           </Button>
         ))}
       </div>
@@ -112,17 +122,17 @@ export default function GoalsPage() {
           <Card>
             <CardContent className="py-12 text-center">
               <Target className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-              <h3 className="font-medium mb-2">{t.goals.no_goals}</h3>
-              <p className="text-sm text-muted-foreground mb-4">{t.goals.create_first}</p>
+              <h3 className="font-medium mb-2">{t.goals?.no_goals || 'Henüz hedef yok'}</h3>
+              <p className="text-sm text-muted-foreground mb-4">{t.goals?.create_first || 'İlk hedefini oluştur'}</p>
               <Button onClick={() => setShowAddModal(true)}>
                 <Plus className="w-4 h-4 mr-2" />
-                {t.goals.add_new}
+                {t.goals?.add_new || 'Yeni Hedef'}
               </Button>
             </CardContent>
           </Card>
         ) : (
           filteredGoals.map((goal) => {
-            const progress = Math.round((goal.current_value / goal.target_value) * 100)
+            const progress = Math.round(((goal.current_value || 0) / (goal.target_value || 1)) * 100)
             const isCompleted = goal.status === 'completed'
             
             return (
@@ -144,11 +154,7 @@ export default function GoalsPage() {
                       </div>
                       <div className="flex items-center gap-2">
                         {isCompleted && <CheckCircle className="w-5 h-5 text-green-500" />}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDelete(goal.id)}
-                        >
+                        <Button variant="ghost" size="icon" onClick={() => handleDelete(goal.id)}>
                           <Trash2 className="w-4 h-4 text-destructive" />
                         </Button>
                       </div>
@@ -156,7 +162,7 @@ export default function GoalsPage() {
 
                     <div className="space-y-2">
                       <div className="flex justify-between text-sm">
-                        <span>{goal.current_value} / {goal.target_value} {goal.unit}</span>
+                        <span>{goal.current_value || 0} / {goal.target_value} {goal.unit}</span>
                         <span className="font-medium">{progress}%</span>
                       </div>
                       <Progress value={progress} className="h-2" />
@@ -167,20 +173,20 @@ export default function GoalsPage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => updateProgress(goal.id, Math.max(0, goal.current_value - 1))}
+                          onClick={() => updateProgress(goal.id, Math.max(0, (goal.current_value || 0) - 1))}
                         >
                           -
                         </Button>
                         <Input
                           type="number"
-                          value={goal.current_value}
+                          value={goal.current_value || 0}
                           onChange={(e) => updateProgress(goal.id, Number(e.target.value))}
                           className="w-20 text-center"
                         />
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => updateProgress(goal.id, goal.current_value + 1)}
+                          onClick={() => updateProgress(goal.id, (goal.current_value || 0) + 1)}
                         >
                           +
                         </Button>
@@ -217,7 +223,7 @@ export default function GoalsPage() {
             onAdd={async (data) => {
               const result = await addGoal(data)
               if (result) {
-                toast.success(t.goals.goal_added)
+                toast.success(t.goals?.goal_added || 'Hedef eklendi')
                 setShowAddModal(false)
               }
             }}
@@ -250,10 +256,12 @@ function AddGoalModal({
   const [unit, setUnit] = useState('')
   const [deadline, setDeadline] = useState('')
   const [category, setCategory] = useState<GoalCategory>('personal')
+  const [submitting, setSubmitting] = useState(false)
 
-  const handleSubmit = () => {
-    if (!title.trim() || !targetValue) return
-    onAdd({
+  const handleSubmit = async () => {
+    if (!title.trim() || !targetValue || submitting) return
+    setSubmitting(true)
+    await onAdd({
       title,
       description,
       target_value: Number(targetValue),
@@ -261,6 +269,7 @@ function AddGoalModal({
       deadline: deadline || undefined,
       category,
     })
+    setSubmitting(false)
   }
 
   return (
@@ -273,23 +282,23 @@ function AddGoalModal({
         onClick={onClose}
       />
       <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        className="fixed inset-4 md:inset-auto md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-full md:max-w-md bg-card rounded-2xl shadow-xl z-50 flex flex-col max-h-[80vh]"
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="fixed left-4 right-4 top-1/2 -translate-y-1/2 md:left-1/2 md:right-auto md:-translate-x-1/2 md:w-full md:max-w-md bg-card rounded-2xl shadow-xl z-50 max-h-[70vh] flex flex-col"
       >
-        {/* Header - Fixed */}
+        {/* Header */}
         <div className="flex items-center justify-between p-4 border-b shrink-0">
-          <h2 className="text-xl font-bold">{t.goals.add_new}</h2>
+          <h2 className="text-lg font-bold">{t.goals?.add_new || 'Yeni Hedef'}</h2>
           <Button variant="ghost" size="icon" onClick={onClose}>
             <X className="w-5 h-5" />
           </Button>
         </div>
 
-        {/* Content - Scrollable */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-3">
           <div>
-            <label className="text-sm font-medium mb-2 block">{t.goals.goal_name} *</label>
+            <label className="text-sm font-medium mb-1 block">{t.goals?.goal_name || 'Hedef Adı'} *</label>
             <Input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -298,18 +307,9 @@ function AddGoalModal({
             />
           </div>
 
-          <div>
-            <label className="text-sm font-medium mb-2 block">{t.goals.description}</label>
-            <Input
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder={language === 'tr' ? 'Açıklama (opsiyonel)' : 'Description (optional)'}
-            />
-          </div>
-
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-sm font-medium mb-2 block">{t.goals.target_value} *</label>
+              <label className="text-sm font-medium mb-1 block">{t.goals?.target_value || 'Hedef'} *</label>
               <Input
                 type="number"
                 value={targetValue}
@@ -318,7 +318,7 @@ function AddGoalModal({
               />
             </div>
             <div>
-              <label className="text-sm font-medium mb-2 block">{t.goals.unit}</label>
+              <label className="text-sm font-medium mb-1 block">{t.goals?.unit || 'Birim'}</label>
               <Input
                 value={unit}
                 onChange={(e) => setUnit(e.target.value)}
@@ -328,7 +328,7 @@ function AddGoalModal({
           </div>
 
           <div>
-            <label className="text-sm font-medium mb-2 block">{t.goals.deadline}</label>
+            <label className="text-sm font-medium mb-1 block">{t.goals?.deadline || 'Bitiş'}</label>
             <Input
               type="date"
               value={deadline}
@@ -337,14 +337,14 @@ function AddGoalModal({
           </div>
 
           <div>
-            <label className="text-sm font-medium mb-2 block">{t.goals.category}</label>
-            <div className="grid grid-cols-3 gap-2">
+            <label className="text-sm font-medium mb-1 block">{t.goals?.category || 'Kategori'}</label>
+            <div className="grid grid-cols-4 gap-1">
               {categories.map((cat) => (
                 <button
                   key={cat.id}
                   onClick={() => setCategory(cat.id)}
                   className={cn(
-                    'px-3 py-2 rounded-lg text-sm font-medium transition-all',
+                    'px-2 py-1.5 rounded-lg text-xs font-medium transition-all',
                     category === cat.id
                       ? 'bg-primary text-primary-foreground'
                       : 'bg-muted hover:bg-accent'
@@ -357,13 +357,13 @@ function AddGoalModal({
           </div>
         </div>
 
-        {/* Footer - Fixed */}
+        {/* Footer */}
         <div className="flex gap-3 p-4 border-t shrink-0">
           <Button variant="outline" className="flex-1" onClick={onClose}>
-            {t.cancel}
+            {t.cancel || 'İptal'}
           </Button>
-          <Button className="flex-1" onClick={handleSubmit} disabled={!title.trim() || !targetValue}>
-            {t.add}
+          <Button className="flex-1" onClick={handleSubmit} disabled={!title.trim() || !targetValue || submitting}>
+            {submitting ? '...' : (t.add || 'Ekle')}
           </Button>
         </div>
       </motion.div>

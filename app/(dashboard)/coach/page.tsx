@@ -14,15 +14,15 @@ import { createClient } from '@/lib/supabase/client'
 import type { CoachMode } from '@/types'
 
 const COACH_INFO_TR = {
-  gentle: { title: 'Nazik Mod', description: 'Destekleyici, motive edici ve anlayışlı yaklaşım.', icon: '💚' },
-  brutal: { title: 'Acımasız Mod', description: 'Sert, gerçekçi ve doğrudan yaklaşım.', icon: '🔥' },
-  predict: { title: '6 Ay Tahmini', description: 'Gelecek odaklı analiz ve tahminler.', icon: '🔮' },
+  gentle: { title: 'Nazik Mod', name: 'Dost', description: 'Destekleyici, motive edici ve anlayışlı. Küçük başarıları kutlar.', icon: '💚' },
+  brutal: { title: 'Acımasız Mod', name: 'Demir', description: 'Sert, direkt ve acımasız. Bahane kabul etmez.', icon: '🔥' },
+  oracle: { title: 'Kahin Mod', name: 'Kahin', description: 'Gizemli ve bilge. Geleceği görür, senaryolar sunar.', icon: '🔮' },
 }
 
 const COACH_INFO_EN = {
-  gentle: { title: 'Gentle Mode', description: 'Supportive, motivating and understanding approach.', icon: '💚' },
-  brutal: { title: 'Brutal Mode', description: 'Harsh, realistic and direct approach.', icon: '🔥' },
-  predict: { title: '6 Month Prediction', description: 'Future-focused analysis and predictions.', icon: '🔮' },
+  gentle: { title: 'Gentle Mode', name: 'Friend', description: 'Supportive, motivating and understanding. Celebrates small wins.', icon: '💚' },
+  brutal: { title: 'Brutal Mode', name: 'Iron', description: 'Harsh, direct and ruthless. No excuses accepted.', icon: '🔥' },
+  oracle: { title: 'Oracle Mode', name: 'Oracle', description: 'Mysterious and wise. Sees the future, offers scenarios.', icon: '🔮' },
 }
 
 const QUICK_PROMPTS_TR = [
@@ -31,7 +31,7 @@ const QUICK_PROMPTS_TR = [
   { label: 'Son 7 gün analizi', prompt: 'Son 7 günümü analiz et. Neler iyi gitti, neler geliştirilmeli?' },
   { label: 'Yarın için plan', prompt: 'Yarın için ne önerirsin? Optimum bir gün planı yap.' },
   { label: 'Alışkanlık önerisi', prompt: 'Bana yeni alışkanlık önerir misin? Hayatımı iyileştirecek.' },
-  { label: 'Hedef kontrolü', prompt: 'Hedeflerime ne kadar yakınım? İlerleme raporumu ver.' },
+  { label: 'Geleceğimi gör', prompt: '6 ay sonra nerede olacağım? Kristal kürene bak ve söyle.' },
 ]
 
 const QUICK_PROMPTS_EN = [
@@ -40,7 +40,7 @@ const QUICK_PROMPTS_EN = [
   { label: 'Last 7 days', prompt: 'Analyze my last 7 days. What went well, what needs improvement?' },
   { label: 'Plan for tomorrow', prompt: 'What do you suggest for tomorrow? Create an optimal day plan.' },
   { label: 'Habit suggestion', prompt: 'Can you suggest a new habit? Something to improve my life.' },
-  { label: 'Goal check', prompt: 'How close am I to my goals? Give me a progress report.' },
+  { label: 'See my future', prompt: 'Where will I be in 6 months? Look into your crystal ball and tell me.' },
 ]
 
 export default function CoachPage() {
@@ -63,7 +63,7 @@ export default function CoachPage() {
   
   const COACH_INFO = language === 'tr' ? COACH_INFO_TR : COACH_INFO_EN
   const QUICK_PROMPTS = language === 'tr' ? QUICK_PROMPTS_TR : QUICK_PROMPTS_EN
-  const currentCoachInfo = COACH_INFO[coachMode]
+  const currentCoachInfo = COACH_INFO[coachMode as keyof typeof COACH_INFO] || COACH_INFO.gentle
 
   useEffect(() => { setMounted(true) }, [])
 
@@ -108,7 +108,7 @@ export default function CoachPage() {
 
   const t = {
     title: language === 'tr' ? 'AI Yaşam Koçu' : 'AI Life Coach',
-    subtitle: language === 'tr' ? 'Acımasızca dürüst veya nazik - sen seç!' : 'Brutally honest or gentle - you choose!',
+    subtitle: language === 'tr' ? 'Nazik, Acımasız veya Kahin - sen seç!' : 'Gentle, Brutal or Oracle - you choose!',
     aboutModes: language === 'tr' ? 'Modlar Hakkında' : 'About Modes',
     clearHistory: language === 'tr' ? 'Geçmişi Temizle' : 'Clear History',
     activeMode: language === 'tr' ? 'Aktif mod' : 'Active mode',
@@ -127,8 +127,8 @@ export default function CoachPage() {
   }
 
   const tips = language === 'tr' 
-    ? ['Spesifik sorular daha iyi cevaplar alır', 'Günlük olarak koçunla konuş', 'Zorlandığında Acımasız modu dene', 'Gelecek planları için Tahmin modunu kullan']
-    : ['Specific questions get better answers', 'Talk to your coach daily', 'Try Brutal mode when struggling', 'Use Predict mode for future plans']
+    ? ['Spesifik sorular daha iyi cevaplar alır', 'Günlük olarak koçunla konuş', 'Zorlandığında Acımasız modu dene', 'Gelecek için Kahin modunu kullan']
+    : ['Specific questions get better answers', 'Talk to your coach daily', 'Try Brutal mode when struggling', 'Use Oracle mode for the future']
 
   if (!mounted) return null
   if (loading) return <div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500" /></div>
@@ -157,12 +157,15 @@ export default function CoachPage() {
 
       {showInfo && (
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="grid md:grid-cols-3 gap-4">
-          {(Object.entries(COACH_INFO) as [CoachMode, typeof COACH_INFO.gentle][]).map(([mode, info]) => (
+          {(Object.entries(COACH_INFO) as [CoachMode, typeof COACH_INFO_TR.gentle][]).map(([mode, info]) => (
             <Card key={mode} className={cn('cursor-pointer transition-all hover:scale-[1.02]', coachMode === mode && 'ring-2 ring-primary')} onClick={() => setCoachMode(mode)}>
               <CardContent className="pt-6">
                 <div className="flex items-center gap-3 mb-2">
                   <span className="text-3xl">{info.icon}</span>
-                  <h3 className="font-bold">{info.title}</h3>
+                  <div>
+                    <h3 className="font-bold">{info.title}</h3>
+                    <p className="text-xs text-muted-foreground">{info.name}</p>
+                  </div>
                 </div>
                 <p className="text-sm text-muted-foreground">{info.description}</p>
               </CardContent>
@@ -183,7 +186,7 @@ export default function CoachPage() {
                 <span className="text-4xl">{currentCoachInfo.icon}</span>
                 <div>
                   <h3 className="font-bold">{currentCoachInfo.title}</h3>
-                  <p className="text-xs text-muted-foreground">{t.activeMode}</p>
+                  <p className="text-xs text-muted-foreground">{t.activeMode}: {currentCoachInfo.name}</p>
                 </div>
               </div>
               <p className="text-sm text-muted-foreground">{currentCoachInfo.description}</p>

@@ -2,12 +2,26 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Send, Sparkles, Flame, Heart, Eye, Loader2 } from 'lucide-react'
+import { Send, Sparkles, Flame, Heart, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAppStore } from '@/lib/store'
+import { useTranslation } from '@/hooks/use-translation'
 import type { CoachMode, CoachMessage } from '@/types'
+
+// Crystal ball icon component
+function CrystalBall({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="10" r="7" />
+      <path d="M8.5 19.5h7" />
+      <path d="M9 22h6" />
+      <path d="M12 17v2" />
+      <path d="M9 8l3 3 3-3" />
+    </svg>
+  )
+}
 
 interface AICoachProps {
   onSendMessage?: (message: string, mode: CoachMode) => Promise<string>
@@ -29,53 +43,108 @@ interface AICoachProps {
   onQuickPromptProcessed?: () => void
 }
 
-const COACH_MODES = [
+const COACH_MODES_TR = [
   {
     id: 'gentle' as const,
     name: 'Nazik',
+    coachName: 'Dost',
     description: 'Destekleyici ve motive edici',
     icon: Heart,
     color: 'from-green-500 to-emerald-500',
     bgColor: 'bg-green-500/10',
     borderColor: 'border-green-500/30',
     textColor: 'text-green-600 dark:text-green-400',
+    emoji: '💚',
   },
   {
     id: 'brutal' as const,
     name: 'Acımasız',
-    description: 'Sert ve gerçekçi',
+    coachName: 'Demir',
+    description: 'Sert ve acımasız',
     icon: Flame,
     color: 'from-red-500 to-orange-500',
     bgColor: 'bg-red-500/10',
     borderColor: 'border-red-500/30',
     textColor: 'text-red-600 dark:text-red-400',
+    emoji: '🔥',
   },
   {
-    id: 'predict' as const,
-    name: '6 Ay Tahmini',
-    description: 'Geleceğe dönük analiz',
-    icon: Eye,
-    color: 'from-indigo-500 to-purple-500',
-    bgColor: 'bg-indigo-500/10',
-    borderColor: 'border-indigo-500/30',
-    textColor: 'text-indigo-600 dark:text-indigo-400',
+    id: 'oracle' as const,
+    name: 'Kahin',
+    coachName: 'Kahin',
+    description: 'Geleceği gören bilge',
+    icon: CrystalBall,
+    color: 'from-purple-500 to-indigo-500',
+    bgColor: 'bg-purple-500/10',
+    borderColor: 'border-purple-500/30',
+    textColor: 'text-purple-600 dark:text-purple-400',
+    emoji: '🔮',
+  },
+]
+
+const COACH_MODES_EN = [
+  {
+    id: 'gentle' as const,
+    name: 'Gentle',
+    coachName: 'Friend',
+    description: 'Supportive and motivating',
+    icon: Heart,
+    color: 'from-green-500 to-emerald-500',
+    bgColor: 'bg-green-500/10',
+    borderColor: 'border-green-500/30',
+    textColor: 'text-green-600 dark:text-green-400',
+    emoji: '💚',
+  },
+  {
+    id: 'brutal' as const,
+    name: 'Brutal',
+    coachName: 'Iron',
+    description: 'Harsh and ruthless',
+    icon: Flame,
+    color: 'from-red-500 to-orange-500',
+    bgColor: 'bg-red-500/10',
+    borderColor: 'border-red-500/30',
+    textColor: 'text-red-600 dark:text-red-400',
+    emoji: '🔥',
+  },
+  {
+    id: 'oracle' as const,
+    name: 'Oracle',
+    coachName: 'Oracle',
+    description: 'The wise seer',
+    icon: CrystalBall,
+    color: 'from-purple-500 to-indigo-500',
+    bgColor: 'bg-purple-500/10',
+    borderColor: 'border-purple-500/30',
+    textColor: 'text-purple-600 dark:text-purple-400',
+    emoji: '🔮',
   },
 ]
 
 export function AICoach({ onSendMessage, stats, className, quickPrompt, onQuickPromptProcessed }: AICoachProps) {
+  const { language } = useTranslation()
   const { coachMode, setCoachMode, coachMessages, addCoachMessage } = useAppStore()
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLTextAreaElement>(null)
 
+  const COACH_MODES = language === 'tr' ? COACH_MODES_TR : COACH_MODES_EN
   const currentMode = COACH_MODES.find(m => m.id === coachMode) || COACH_MODES[0]
+
+  const t = {
+    title: language === 'tr' ? 'AI Yaşam Koçu' : 'AI Life Coach',
+    thinking: language === 'tr' ? 'Düşünüyor...' : 'Thinking...',
+    placeholder: language === 'tr' ? 'Mesajını yaz...' : 'Type your message...',
+    modeLabel: language === 'tr' ? 'Mod' : 'Mode',
+    startMessage: language === 'tr' 
+      ? 'Bugün nasıl hissediyorsun? Hedeflerinle ilgili konuşalım.'
+      : 'How are you feeling today? Let\'s talk about your goals.',
+  }
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [coachMessages])
 
-  // Handle quick prompt from parent
   useEffect(() => {
     if (quickPrompt && !isLoading) {
       sendMessage(quickPrompt)
@@ -153,7 +222,7 @@ export function AICoach({ onSendMessage, stats, className, quickPrompt, onQuickP
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2">
           <Sparkles className="w-5 h-5 text-primary" />
-          AI Yaşam Koçu
+          {t.title}
         </CardTitle>
 
         {/* Mode selector */}
@@ -175,7 +244,7 @@ export function AICoach({ onSendMessage, stats, className, quickPrompt, onQuickP
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
               >
-                <Icon className={cn('w-5 h-5', isActive ? mode.textColor : 'text-muted-foreground')} />
+                <span className="text-xl">{mode.emoji}</span>
                 <span className={cn('text-xs font-medium', isActive ? mode.textColor : '')}>
                   {mode.name}
                 </span>
@@ -196,19 +265,20 @@ export function AICoach({ onSendMessage, stats, className, quickPrompt, onQuickP
                 className="flex flex-col items-center justify-center h-full text-center p-4"
               >
                 <div className={cn(
-                  'w-16 h-16 rounded-full flex items-center justify-center mb-4',
+                  'w-20 h-20 rounded-full flex items-center justify-center mb-4 text-4xl',
                   currentMode.bgColor
                 )}>
-                  <currentMode.icon className={cn('w-8 h-8', currentMode.textColor)} />
+                  {currentMode.emoji}
                 </div>
-                <h3 className="font-semibold mb-2">{currentMode.name} Mod</h3>
+                <h3 className="font-semibold mb-1 text-lg">{currentMode.coachName}</h3>
+                <p className={cn('text-sm font-medium mb-2', currentMode.textColor)}>{currentMode.name} {t.modeLabel}</p>
                 <p className="text-sm text-muted-foreground max-w-xs">
-                  {currentMode.description}. Bugün nasıl hissediyorsun? Hedeflerinle ilgili konuşalım.
+                  {currentMode.description}. {t.startMessage}
                 </p>
               </motion.div>
             ) : (
               coachMessages.map((message) => (
-                <MessageBubble key={message.id} message={message} />
+                <MessageBubble key={message.id} message={message} modes={COACH_MODES} />
               ))
             )}
           </AnimatePresence>
@@ -222,7 +292,7 @@ export function AICoach({ onSendMessage, stats, className, quickPrompt, onQuickP
               <div className={cn('w-8 h-8 rounded-full flex items-center justify-center', currentMode.bgColor)}>
                 <Loader2 className={cn('w-4 h-4 animate-spin', currentMode.textColor)} />
               </div>
-              <span className="text-sm">Düşünüyor...</span>
+              <span className="text-sm">{t.thinking}</span>
             </motion.div>
           )}
           
@@ -233,11 +303,10 @@ export function AICoach({ onSendMessage, stats, className, quickPrompt, onQuickP
         <div className="mt-4 pt-4 border-t border-border">
           <div className="flex gap-2">
             <textarea
-              ref={inputRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Mesajını yaz..."
+              placeholder={t.placeholder}
               className={cn(
                 'flex-1 min-h-[44px] max-h-[120px] px-4 py-2 rounded-xl border resize-none',
                 'bg-background text-foreground placeholder:text-muted-foreground',
@@ -262,8 +331,8 @@ export function AICoach({ onSendMessage, stats, className, quickPrompt, onQuickP
   )
 }
 
-function MessageBubble({ message }: { message: CoachMessage }) {
-  const mode = COACH_MODES.find(m => m.id === message.mode) || COACH_MODES[0]
+function MessageBubble({ message, modes }: { message: CoachMessage; modes: typeof COACH_MODES_TR }) {
+  const mode = modes.find(m => m.id === message.mode) || modes[0]
   const isUser = message.role === 'user'
 
   return (
@@ -273,8 +342,8 @@ function MessageBubble({ message }: { message: CoachMessage }) {
       className={cn('flex gap-2', isUser ? 'flex-row-reverse' : 'flex-row')}
     >
       {!isUser && (
-        <div className={cn('w-8 h-8 rounded-full flex items-center justify-center shrink-0', mode.bgColor)}>
-          <mode.icon className={cn('w-4 h-4', mode.textColor)} />
+        <div className={cn('w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-lg', mode.bgColor)}>
+          {mode.emoji}
         </div>
       )}
       
@@ -307,48 +376,18 @@ async function mockCoachResponse(message: string, mode: CoachMode): Promise<stri
 
   const responses = {
     gentle: [
-      'Bugün harika bir adım attın! Her küçük ilerleme, büyük değişimlerin başlangıcıdır. 💪',
-      'Kendine karşı sabırlı ol. Değişim zaman alır ve sen doğru yoldasın. ✨',
-      'Hedeflerine odaklanman çok güzel! Yarın için planın ne olacak?',
+      'Bugün harika bir adım attın! 💚 Her küçük ilerleme, büyük değişimlerin başlangıcıdır. Kendine güven, bu yolda yanındayım! ✨',
+      'Kendine karşı sabırlı ol. Değişim zaman alır ve sen doğru yoldasın. Yarın yeni bir gün! 🌱',
     ],
     brutal: [
-      'Bahaneler seni hedeflerine yaklaştırmaz. Ya yaparsın, ya da yapmazsın. Ortası yok.',
-      'Geçen hafta da aynı şeyi söyledin. Sonuç? Sıfır. Eyleme geç!',
-      'Rahat bölgenden çık! O koltukta oturarak değişmeyeceksin.',
+      'Bahane üretmeyi bırak. Ya yaparsın, ya da yapmazsın. Ortası yok. Koltuktan kalk ve hareket et! 🔥',
+      'Geçen hafta da aynı şeyi söyledin. Sonuç? SIFIR. Konuşma, eyleme geç!',
     ],
-    predict: [
-      '📊 Mevcut alışkanlıklarınla devam edersen, 6 ay sonra: Fitness seviyesi %15 artış, produktivite stabil. Potansiyelin bunun çok üstünde.',
-      '🔮 Analiz: Uyku düzenin düzelirse, 6 ay içinde enerji seviyesi %40 artabilir. Şu an kayıp ediyorsun.',
-      '📈 Trend: Son 2 hafta pozitif. Bu ivmeyi korursan, 6 ay sonra hedeflerinin %80\'ine ulaşabilirsin.',
+    oracle: [
+      '🔮 Kristal küreme bakıyorum... Üç yol görüyorum önünde:\n\n🌟 İYİMSER: Tutarlı olursan 6 ay sonra hedeflerinin %80\'ine ulaşırsın\n⚖️ GERÇEKÇİ: Bu tempoyla %50 civarında kalırsın\n⚠️ UYARI: Bırakırsan gerileme kaçınılmaz\n\nKader senin elinde...',
     ],
   }
 
-  const modeResponses = responses[mode]
+  const modeResponses = responses[mode] || responses.gentle
   return modeResponses[Math.floor(Math.random() * modeResponses.length)]
-}
-
-// Quick action buttons for common prompts
-export function CoachQuickActions({ onSelect }: { onSelect: (prompt: string) => void }) {
-  const quickPrompts = [
-    { label: 'Bugün nasılım?', prompt: 'Bugünkü performansımı değerlendir' },
-    { label: 'Motivasyon', prompt: 'Beni motive et, devam etmem için' },
-    { label: 'Analiz', prompt: 'Son 7 günümü analiz et' },
-    { label: 'Öneri', prompt: 'Yarın için ne önerirsin?' },
-  ]
-
-  return (
-    <div className="flex flex-wrap gap-2">
-      {quickPrompts.map((item) => (
-        <Button
-          key={item.label}
-          variant="outline"
-          size="sm"
-          onClick={() => onSelect(item.prompt)}
-          className="rounded-full"
-        >
-          {item.label}
-        </Button>
-      ))}
-    </div>
-  )
 }

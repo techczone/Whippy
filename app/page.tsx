@@ -46,17 +46,17 @@ const CONTENT = {
       title: 'AI Koçunu Seç 🤖',
       subtitle: 'Her mod farklı bir yaklaşım. Ruh haline göre değiştir.',
       modes: [
-        { name: 'Nazik Mod', description: 'Destekleyici, motive edici ve anlayışlı geri bildirimler.', emoji: '💚', example: '"Bugün 3 alışkanlık tamamladın, harika gidiyorsun! 🌟"', color: 'bg-green-500/20 text-green-500 border-green-500/30' },
-        { name: 'Acımasız Mod', description: 'Direkt, sert ve bahane kabul etmeyen yaklaşım.', emoji: '🔥', example: '"Geçen hafta da aynı bahaneyi söyledin. Eyleme geç!"', color: 'bg-red-500/20 text-red-500 border-red-500/30' },
-        { name: '6 Ay Tahmini', description: 'Mevcut verilerle geleceğe dönük senaryo analizi.', emoji: '🔮', example: '"Bu tempoyla 6 ay sonra hedefinin %80\'ine ulaşırsın."', color: 'bg-purple-500/20 text-purple-500 border-purple-500/30' },
+        { name: 'Nazik Mod', coachName: 'Dost', description: 'Destekleyici, motive edici ve anlayışlı. Küçük başarıları kutlar.', emoji: '💚', example: '"Harika gidiyorsun! 💚 Kendine güven, bu yolda yanındayım!"', color: 'bg-green-500/20 text-green-500 border-green-500/30' },
+        { name: 'Acımasız Mod', coachName: 'Demir', description: 'Sert, direkt ve acımasız. Bahane kabul etmez, gerçekleri yüzüne vurur.', emoji: '🔥', example: '"Bahane üretmeyi bırak. Ya yap ya da yapma. Koltuktan kalk!"', color: 'bg-red-500/20 text-red-500 border-red-500/30' },
+        { name: 'Kahin Mod', coachName: 'Kahin', description: 'Gizemli ve bilge. Kristal küresine bakıp geleceğini görür.', emoji: '🔮', example: '"Kristal küreme bakıyorum... 3 yol görüyorum önünde..."', color: 'bg-purple-500/20 text-purple-500 border-purple-500/30' },
       ],
     },
     testimonials: {
       title: 'Kullanıcılar Ne Diyor? 🗣️',
       items: [
-        { quote: 'Acımasız mod sayesinde 3 ayda 15 kilo verdim. Bahanelere artık yer yok!', author: 'Mehmet K.', role: 'Yazılım Mühendisi', avatar: '👨‍💻' },
-        { quote: '6 ay tahmini özelliği gözlerimi açtı. Şimdi her gün daha bilinçli yaşıyorum.', author: 'Ayşe T.', role: 'Girişimci', avatar: '👩‍💼' },
-        { quote: 'Alışkanlık takibi ile 100 günlük seri yaptım. Bu uygulama hayatımı değiştirdi.', author: 'Can B.', role: 'Öğrenci', avatar: '👨‍🎓' },
+        { quote: 'Acımasız mod sayesinde 3 ayda 15 kilo verdim. Demir koç bahanelere yer bırakmıyor!', author: 'Mehmet K.', role: 'Yazılım Mühendisi', avatar: '👨‍💻' },
+        { quote: 'Kahin modunun kristal küresi gözlerimi açtı. Geleceğimi görmek motivasyonumu artırdı.', author: 'Ayşe T.', role: 'Girişimci', avatar: '👩‍💼' },
+        { quote: 'Dost koçla başladım, şimdi 100 günlük serideyim. Bu uygulama hayatımı değiştirdi.', author: 'Can B.', role: 'Öğrenci', avatar: '👨‍🎓' },
       ],
     },
     pricing: {
@@ -105,17 +105,17 @@ const CONTENT = {
       title: 'Choose Your AI Coach 🤖',
       subtitle: 'Each mode has a different approach. Switch based on your mood.',
       modes: [
-        { name: 'Gentle Mode', description: 'Supportive, motivating and understanding feedback.', emoji: '💚', example: '"You completed 3 habits today, great job! 🌟"', color: 'bg-green-500/20 text-green-500 border-green-500/30' },
-        { name: 'Brutal Mode', description: 'Direct, harsh and no-excuses approach.', emoji: '🔥', example: '"You said the same thing last week. Take action!"', color: 'bg-red-500/20 text-red-500 border-red-500/30' },
-        { name: '6 Month Prediction', description: 'Future scenario analysis based on current data.', emoji: '🔮', example: '"At this pace, you\'ll reach 80% of your goal in 6 months."', color: 'bg-purple-500/20 text-purple-500 border-purple-500/30' },
+        { name: 'Gentle Mode', coachName: 'Friend', description: 'Supportive, motivating and understanding. Celebrates small wins.', emoji: '💚', example: '"You\'re doing great! 💚 I believe in you, keep going!"', color: 'bg-green-500/20 text-green-500 border-green-500/30' },
+        { name: 'Brutal Mode', coachName: 'Iron', description: 'Harsh, direct and ruthless. No excuses, faces you with reality.', emoji: '🔥', example: '"Stop making excuses. Do it or don\'t. Get off the couch!"', color: 'bg-red-500/20 text-red-500 border-red-500/30' },
+        { name: 'Oracle Mode', coachName: 'Oracle', description: 'Mysterious and wise. Gazes into the crystal ball to see your future.', emoji: '🔮', example: '"I gaze into my crystal ball... I see 3 paths before you..."', color: 'bg-purple-500/20 text-purple-500 border-purple-500/30' },
       ],
     },
     testimonials: {
       title: 'What Users Say 🗣️',
       items: [
-        { quote: 'Lost 15kg in 3 months thanks to brutal mode. No more excuses!', author: 'John K.', role: 'Software Engineer', avatar: '👨‍💻' },
-        { quote: '6 month prediction feature opened my eyes. I live more consciously now.', author: 'Sarah T.', role: 'Entrepreneur', avatar: '👩‍💼' },
-        { quote: 'Made a 100-day streak with habit tracking. This app changed my life.', author: 'Mike B.', role: 'Student', avatar: '👨‍🎓' },
+        { quote: 'Lost 15kg in 3 months thanks to Iron coach in Brutal mode. No excuses allowed!', author: 'John K.', role: 'Software Engineer', avatar: '👨‍💻' },
+        { quote: 'Oracle mode\'s crystal ball opened my eyes. Seeing my future boosted my motivation.', author: 'Sarah T.', role: 'Entrepreneur', avatar: '👩‍💼' },
+        { quote: 'Started with Friend coach, now on a 100-day streak. This app changed my life.', author: 'Mike B.', role: 'Student', avatar: '👨‍🎓' },
       ],
     },
     pricing: {

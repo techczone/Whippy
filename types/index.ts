@@ -18,7 +18,7 @@ export interface UserSettings {
 }
 
 // Coach types
-export type CoachMode = 'gentle' | 'brutal' | 'predict'
+export type CoachMode = 'gentle' | 'brutal' | 'oracle'
 
 export interface CoachMessage {
   id: string
@@ -247,7 +247,7 @@ export const TIER_LIMITS = {
     max_projects: 1,
     ai_messages_per_day: 5,
     brutal_mode: false,
-    predictions: false,
+    oracle_mode: false,
     reports: false,
     integrations: false,
   },
@@ -257,7 +257,7 @@ export const TIER_LIMITS = {
     max_projects: 10,
     ai_messages_per_day: 50,
     brutal_mode: true,
-    predictions: true,
+    oracle_mode: true,
     reports: true,
     integrations: true,
   },
@@ -267,7 +267,7 @@ export const TIER_LIMITS = {
     max_projects: -1,
     ai_messages_per_day: -1,
     brutal_mode: true,
-    predictions: true,
+    oracle_mode: true,
     reports: true,
     integrations: true,
   },

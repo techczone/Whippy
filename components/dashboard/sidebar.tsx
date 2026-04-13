@@ -21,6 +21,7 @@ import {
   BarChart3,
   User,
   Globe,
+  Users,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -33,12 +34,10 @@ export function Sidebar() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const { t, language } = useTranslation()
 
-  // Close mobile menu on route change
   useEffect(() => {
     setMobileOpen(false)
   }, [pathname])
 
-  // Prevent body scroll when mobile menu is open
   useEffect(() => {
     if (mobileOpen) {
       document.body.style.overflow = 'hidden'
@@ -59,6 +58,7 @@ export function Sidebar() {
     { label: t.nav.coach, href: '/coach', icon: Sparkles },
     { label: t.nav.reports, href: '/reports', icon: BarChart3 },
     { label: t.nav.calendar, href: '/calendar', icon: Calendar },
+    { label: t.nav.social || (language === 'tr' ? 'Sosyal' : 'Social'), href: '/social', icon: Users },
   ]
 
   const BOTTOM_NAV_ITEMS = [
@@ -77,7 +77,6 @@ export function Sidebar() {
 
   return (
     <>
-      {/* Mobile menu button */}
       <Button
         variant="ghost"
         size="icon"
@@ -87,7 +86,6 @@ export function Sidebar() {
         {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
       </Button>
 
-      {/* Mobile overlay */}
       <AnimatePresence>
         {mobileOpen && (
           <motion.div
@@ -100,30 +98,19 @@ export function Sidebar() {
         )}
       </AnimatePresence>
 
-      {/* Sidebar */}
       <aside
         className={cn(
           'fixed top-0 left-0 bg-card border-r border-border z-40',
           'flex flex-col transition-all duration-300 ease-in-out',
-          // Height - mobile: leave space for bottom nav (64px), desktop: full
           'h-[calc(100dvh-64px)] md:h-dvh',
-          // Desktop
           'md:relative md:translate-x-0',
           sidebarOpen ? 'md:w-64' : 'md:w-20',
-          // Mobile
           mobileOpen ? 'translate-x-0 w-64' : '-translate-x-full w-64'
         )}
       >
-        {/* Logo */}
         <div className="p-4 border-b border-border shrink-0">
           <Link href="/dashboard" className="flex items-center" onClick={handleNavClick}>
-            <Image 
-              src="/logo.png" 
-              alt="Whippy" 
-              width={36} 
-              height={36}
-              className="rounded-xl shrink-0"
-            />
+            <Image src="/logo.png" alt="Whippy" width={36} height={36} className="rounded-xl shrink-0" />
             <AnimatePresence>
               {(sidebarOpen || mobileOpen) && (
                 <motion.span
@@ -139,20 +126,16 @@ export function Sidebar() {
           </Link>
         </div>
 
-        {/* Navigation - scrollable area */}
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto min-h-0">
           {NAV_ITEMS.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
             const Icon = item.icon
-
             return (
               <Link key={item.href} href={item.href} onClick={handleNavClick}>
                 <motion.div
                   className={cn(
                     'flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all',
-                    isActive 
-                      ? 'bg-primary text-primary-foreground' 
-                      : 'hover:bg-accent/50 text-muted-foreground hover:text-foreground'
+                    isActive ? 'bg-primary text-primary-foreground' : 'hover:bg-accent/50 text-muted-foreground hover:text-foreground'
                   )}
                   whileHover={{ x: 4 }}
                   whileTap={{ scale: 0.98 }}
@@ -176,21 +159,16 @@ export function Sidebar() {
           })}
         </nav>
 
-        {/* Bottom section - Profile, Settings, Language */}
         <div className="p-3 border-t border-border shrink-0">
-          {/* Profile & Settings */}
           {BOTTOM_NAV_ITEMS.map((item) => {
             const isActive = pathname === item.href
             const Icon = item.icon
-
             return (
               <Link key={item.href} href={item.href} onClick={handleNavClick}>
                 <motion.div
                   className={cn(
                     'flex items-center gap-3 px-3 py-2 rounded-xl transition-all',
-                    isActive 
-                      ? 'bg-primary text-primary-foreground' 
-                      : 'hover:bg-accent/50 text-muted-foreground hover:text-foreground'
+                    isActive ? 'bg-primary text-primary-foreground' : 'hover:bg-accent/50 text-muted-foreground hover:text-foreground'
                   )}
                   whileHover={{ x: 4 }}
                   whileTap={{ scale: 0.98 }}
@@ -213,7 +191,6 @@ export function Sidebar() {
             )
           })}
 
-          {/* Language Switcher */}
           <motion.button
             onClick={toggleLanguage}
             className={cn(
@@ -241,7 +218,6 @@ export function Sidebar() {
           </motion.button>
         </div>
 
-        {/* Toggle button (desktop only) */}
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
           className={cn(
@@ -250,26 +226,21 @@ export function Sidebar() {
             'items-center justify-center hover:bg-accent transition-colors'
           )}
         >
-          {sidebarOpen ? (
-            <ChevronLeft className="w-4 h-4" />
-          ) : (
-            <ChevronRight className="w-4 h-4" />
-          )}
+          {sidebarOpen ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
         </button>
       </aside>
     </>
   )
 }
 
-// Mobile bottom navigation
 export function MobileBottomNav() {
   const pathname = usePathname()
-  const { t } = useTranslation()
+  const { t, language } = useTranslation()
 
   const mobileItems = [
     { label: t.nav.dashboard, href: '/dashboard', icon: LayoutDashboard },
     { label: t.nav.habits, href: '/habits', icon: Target },
-    { label: t.nav.health, href: '/health', icon: Heart },
+    { label: t.nav.social || (language === 'tr' ? 'Sosyal' : 'Social'), href: '/social', icon: Users },
     { label: t.nav.coach, href: '/coach', icon: Sparkles },
     { label: t.nav.profile, href: '/profile', icon: User },
   ]
@@ -280,7 +251,6 @@ export function MobileBottomNav() {
         {mobileItems.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
           const Icon = item.icon
-
           return (
             <Link
               key={item.href}

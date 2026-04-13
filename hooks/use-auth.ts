@@ -22,7 +22,6 @@ export function useAuth() {
 
   // Initialize auth state
   useEffect(() => {
-    // Get initial session
     const initAuth = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession()
@@ -40,7 +39,7 @@ export function useAuth() {
 
     initAuth()
 
-    // Listen to ALL auth changes including token refresh
+    // Listen to ALL auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('Auth event:', event)
@@ -56,6 +55,17 @@ export function useAuth() {
     return () => {
       subscription.unsubscribe()
     }
+  }, [supabase])
+
+  // Sign in with OAuth (Google, Apple)
+  const signInWithOAuth = useCallback(async (provider: 'google' | 'apple') => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    })
+    if (error) throw error
   }, [supabase])
 
   // Sign in with email
@@ -90,6 +100,7 @@ export function useAuth() {
     user: state.user,
     session: state.session,
     loading: state.loading,
+    signInWithOAuth,
     signInWithEmail,
     signUpWithEmail,
     signOut,

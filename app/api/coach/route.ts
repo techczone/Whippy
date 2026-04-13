@@ -17,61 +17,115 @@ interface CoachRequestBody {
     water: number
     goals: string
     projects: string
+    streak?: number
+    habits?: string[]
   }
   history?: Array<{ role: 'user' | 'assistant'; content: string }>
 }
 
 function getSystemPrompt(mode: string, stats: CoachRequestBody['stats']): string {
-  const basePrompt = `Sen profesyonel bir AI yaşam koçusun. Türkçe yanıt ver. Her zaman samimi, doğrudan ve yardımcı ol.
+  const habitList = stats.habits?.length 
+    ? stats.habits.join(', ') 
+    : 'henüz yok'
 
-Kullanıcının güncel verileri:
-- Alışkanlıklar: ${stats.completedHabits}/${stats.totalHabits} tamamlandı (${stats.habitScore}%)
-- Sağlık skoru: ${stats.healthScore}%
-- Ruh hali skoru: ${stats.moodScore}%
-- Genel skor: ${stats.overallScore}%
-- Bugünkü egzersiz: ${stats.exercise} dakika
-- Uyku: ${stats.sleep} saat
-- Su tüketimi: ${stats.water} litre
-- Hedefler: ${stats.goals || 'henüz yok'}
-- Projeler: ${stats.projects || 'henüz yok'}
+  const dataBlock = `
+📊 KULLANICININ VERİLERİ:
+- Alışkanlık: ${stats.completedHabits}/${stats.totalHabits} (%${stats.habitScore})
+- Sağlık skoru: %${stats.healthScore}
+- Ruh hali: %${stats.moodScore}
+- Genel: %${stats.overallScore}
+- Egzersiz: ${stats.exercise} dk | Uyku: ${stats.sleep} saat | Su: ${stats.water} L
+- Seri: ${stats.streak || 0} gün
+- Alışkanlıklar: ${habitList}
+- Hedefler: ${stats.goals || 'yok'}
+- Projeler: ${stats.projects || 'yok'}
+`
 
-Yanıtlarını kısa ve öz tut (maksimum 150 kelime). Emoji kullanabilirsin.`
+  const characters = {
+    gentle: `Sen "WHIPPY" - dünyanın en destekleyici, sıcacık AI yaşam koçusun. 
 
-  const modeParts = {
-    gentle: `
+🌸 KARAKTERİN:
+- Bir çay içerken sohbet eden en yakın arkadaş gibisin
+- Her küçük başarıda konfeti patlatırsın 🎉
+- "Canım", "tatlım", "süpersin" gibi samimi hitaplar kullanırsın
+- Kötü günlerde bile gümüş astar bulursun
+- Emoji bolca kullan ama abartma (2-4 per mesaj)
+- Mizahi ve neşeli ol, espri yap
 
-🌱 NAZİK MOD AKTİF
-- Destekleyici ve motive edici ol
-- Küçük başarıları kutla ("Harika gidiyorsun!" gibi)
-- Yapıcı öneriler sun
-- Empati göster ve anlayışlı ol
-- Pozitif dil kullan`,
+💬 ÖRNEK TARZ:
+- "Aaa bugün 2 alışkanlık mı tamamladın? Kralsın sen ya! 👑"
+- "Uyku 5 saat mi? Olsun canım, yarın telafi ederiz. Bu gece erken yatağa atla!"
+- "Su içmeyi unutmuşsun galiba... Hadi şimdi bir bardak iç, bekliyorum! 💧"
 
-    brutal: `
+⚠️ YASAK:
+- Asla eleştirme veya suçlama
+- "Yapmalısın", "zorundasın" gibi baskıcı ifadeler kullanma
+- Uzun paragraflar yazma, kısa ve tatlı tut`,
 
-🔥 ACIMASIZCA DÜRÜST MOD AKTİF!
-- Bahaneleri asla kabul etme
-- Direkt ve sert konuş, yuvarlama
-- "Ama", "belki", "deneyebilirsin" gibi yumuşak ifadeler KULLANMA
-- Gerçekleri yüzlerine vur
-- Motivasyon konuşması yapma, sadece gerçekleri söyle
-- Eğer performans düşükse bunu açıkça belirt
-- Örnek: "3 gündür egzersiz yapmamışsın. Bu bahane değil tembellik."`,
+    brutal: `Sen "ACIMAZ KOÇO" - Türkiye'nin en acımasız, en sarkastik fitness koçusun.
 
-    predict: `
+🔥 KARAKTERİN:
+- Jocko Willink + Şahan Gökbakar karışımısın
+- Bahanelere alerjin var, duyunca göz tikine giriyorsun
+- Sarkastik, iğneleyici ama komik
+- Türk dizi/film referansları yapabilirsin
+- Küfür etmezsin ama iğnelersin
+- Her cümlede bir yerde vurucu bir laf olmalı
 
-🔮 6 AY TAHMİN MODU AKTİF
-- Mevcut verilere dayanarak 6 ay sonraki durumu tahmin et
-- Her zaman 3 senaryo sun:
-  1. 🚀 İYİMSER: Tüm alışkanlıklar tutulursa
-  2. ⚖️ GERÇEKÇİ: Mevcut tempo devam ederse  
-  3. ⚠️ KÖTÜMSERİ: Performans düşerse
-- Somut rakamlar ve olasılıklar ver
-- Hangi alışkanlıkların en büyük etkiyi yapacağını belirt
-- "Eğer X'i değiştirirsen, Y olur" formatında öneriler ver`,
+💬 ÖRNEK TARZ:
+- "0 dakika egzersiz? Vay be, koltuk seni çok özlemiş demek ki. Kavuşmuşsunuz, maşallah. 🛋️"
+- "Uyku 4 saat... Gece 3'te ne yapıyordun? Netflix mi? TikTok mu? Kendi hayatının yan karakteri olmaya devam."
+- "Su 0.5 litre? Çöl kaktüsü bile senden fazla su içiyordur şu an."
+- "'Yarın başlarım' diyorsun ama yarın dünün yarınıydı. Bugün ne oldu peki? HİÇ."
+- "Alışkanlık %30? Ortaokulda bu notla sınıfta kalırdın haberin olsun."
+
+🎯 FORMAT:
+1. Önce iğnele/dalga geç (2-3 cümle)
+2. Sonra gerçeği söyle (1 cümle)
+3. En son ne yapması gerektiğini emret (1 cümle)
+
+⚠️ YASAK:
+- Nazik olmak (kesinlikle yasak)
+- "Olsun", "sorun değil", "idare eder" gibi yumuşak ifadeler
+- Uzun açıklamalar - kısa ve yıkıcı ol`,
+
+    predict: `Sen "ORACLE" - gizemli, bilge ve biraz ürkütücü bir kahin AI'sın.
+
+🔮 KARAKTERİN:
+- Kristal küreye bakan mistik bir kahin gibi konuş
+- Dramatik ve teatral ol
+- "Görüyorum ki...", "Gelecek şunu fısıldıyor..." gibi ifadeler kullan
+- Hem korkutucu hem motive edici ol
+- Somut rakamlar ve olasılıklar ver ama gizemli paketle
+
+💬 ÖRNEK TARZ:
+- "Hmm... Kristal kürem bulanıklaşıyor... Çünkü 0 dakika egzersiz görüyorum. 6 ay sonra? 📉 Merdiven çıkarken nefes nefese kalacaksın."
+- "Ahhh, ilginç bir gelecek... İki yol görüyorum: 
+  🌟 Işık yolu: Her gün 30dk yürürsen, 6 ayda 8 kilo gider
+  🕳️ Karanlık yol: Böyle devam edersen, 6 ayda +5 kilo ve kronik yorgunluk"
+- "Bekle... Bir vizyon geliyor... %${stats.habitScore} alışkanlık skoru ile devam edersen... *dramatik sessizlik* ...6 ay sonra aynı yerde olacaksın. Sürpriz yok."
+
+🎯 FORMAT:
+Her zaman 2-3 senaryo sun:
+- 🚀 Parlak Gelecek (eğer değişirse)
+- ⚖️ Mevcut Gidişat (değişmezse)  
+- 💀 Karanlık Gelecek (daha da kötüye giderse)
+
+Somut tahminler ver: "6 ayda X kilo", "%Y olasılıkla Z olur" gibi.
+
+⚠️ YASAK:
+- Sıkıcı ve düz konuşmak
+- Sadece veri tekrarı yapmak
+- Drama olmadan cevap vermek`
   }
 
-  return basePrompt + (modeParts[mode as keyof typeof modeParts] || modeParts.gentle)
+  return characters[mode as keyof typeof characters] + '\n\n' + dataBlock + `
+
+📏 GENEL KURALLAR:
+- Türkçe yanıt ver
+- Maksimum 100 kelime (kısa ve öz)
+- Her mesaj karakterine uygun olsun
+- Verilerden bahset, kişiselleştirilmiş ol`
 }
 
 export async function POST(request: NextRequest) {
@@ -79,151 +133,80 @@ export async function POST(request: NextRequest) {
     const body: CoachRequestBody = await request.json()
     const { message, mode, stats, history = [] } = body
 
-    // Mesaj geçmişini formatla
+    const GROQ_API_KEY = process.env.GROQ_API_KEY
+
+    if (!GROQ_API_KEY) {
+      return NextResponse.json({
+        content: getDemoResponse(mode, stats),
+        isDemo: true,
+      })
+    }
+
     const messages = [
       { role: 'system' as const, content: getSystemPrompt(mode, stats) },
-      ...history.slice(-10).map((m) => ({
+      ...history.slice(-6).map((m) => ({
         role: m.role as 'user' | 'assistant',
         content: m.content,
       })),
       { role: 'user' as const, content: message },
     ]
 
-    // Önce Groq'u dene (daha hızlı ve ücretsiz)
-    const groqKey = process.env.GROQ_API_KEY
-    
-    if (groqKey) {
-      try {
-        const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${groqKey}`,
-          },
-          body: JSON.stringify({
-            model: 'llama-3.3-70b-versatile',
-            messages,
-            max_tokens: 1024,
-            temperature: 0.7,
-          }),
-        })
-
-        if (groqResponse.ok) {
-          const data = await groqResponse.json()
-          const content = data.choices?.[0]?.message?.content || 'Bir hata oluştu.'
-          return NextResponse.json({ content, provider: 'groq' })
-        }
-      } catch (groqError) {
-        console.error('Groq error:', groqError)
-      }
-    }
-
-    // Groq başarısızsa Anthropic'i dene
-    const anthropicKey = process.env.ANTHROPIC_API_KEY
-    
-    if (anthropicKey) {
-      try {
-        const anthropicMessages = messages.filter(m => m.role !== 'system')
-        const systemPrompt = messages.find(m => m.role === 'system')?.content || ''
-        
-        const response = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': anthropicKey,
-            'anthropic-version': '2023-06-01',
-          },
-          body: JSON.stringify({
-            model: 'claude-sonnet-4-20250514',
-            max_tokens: 1024,
-            system: systemPrompt,
-            messages: anthropicMessages,
-          }),
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-          const content = data.content?.[0]?.text || 'Bir hata oluştu.'
-          return NextResponse.json({ content, provider: 'anthropic' })
-        }
-      } catch (anthropicError) {
-        console.error('Anthropic error:', anthropicError)
-      }
-    }
-
-    // Her iki API de başarısızsa demo yanıt
-    return NextResponse.json({
-      content: getDemoResponse(mode, stats),
-      provider: 'demo',
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${GROQ_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: 'llama-3.1-70b-versatile',
+        messages,
+        max_tokens: 400,
+        temperature: mode === 'brutal' ? 0.95 : mode === 'predict' ? 0.8 : 0.75,
+      }),
     })
-    
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('Groq API error:', errorText)
+      return NextResponse.json({
+        content: getDemoResponse(mode, stats),
+        isDemo: true,
+      })
+    }
+
+    const data = await response.json()
+    const content = data.choices?.[0]?.message?.content || 'Bir hata oluştu.'
+
+    return NextResponse.json({ content, isDemo: false })
   } catch (error) {
     console.error('Coach API error:', error)
-    
     return NextResponse.json({
-      content: 'Şu an AI koçuna bağlanamıyorum. Lütfen daha sonra tekrar dene.',
-      provider: 'error',
+      content: 'Bağlantı hatası 🔄',
+      isDemo: true,
     })
   }
 }
 
-// Demo yanıtlar (API key olmadığında kullanılır)
 function getDemoResponse(mode: string, stats: CoachRequestBody['stats']): string {
-  const habitPercent = stats.habitScore
-  const overallScore = stats.overallScore
-
   const responses = {
     gentle: [
-      habitPercent >= 70
-        ? `Harika gidiyorsun! 💪 ${stats.completedHabits} alışkanlık tamamladın, bu çok güzel bir ilerleme. Kendine güven, bu tempoda devam et!`
-        : `Bugün biraz zor geçmiş olabilir, sorun değil. ${stats.completedHabits} alışkanlık tamamladın, her adım önemli. Yarın yeni bir gün! 🌱`,
-      `Sağlık skorun ${stats.healthScore}%. ${
-        stats.exercise > 0
-          ? `${stats.exercise} dakika egzersiz yapmışsın, bu harika!`
-          : 'Bugün biraz hareket eklemeye ne dersin?'
-      }`,
-      `Genel skorun ${overallScore}%. ${
-        overallScore >= 60
-          ? 'Doğru yoldasın, böyle devam!'
-          : 'Adım adım ilerle, her gün biraz daha iyi olacaksın.'
-      } ✨`,
+      `Canım benim! 🌸 Bugün ${stats.completedHabits} alışkanlık tamamlamışsın, harikasın! ${stats.exercise > 0 ? `${stats.exercise} dakika egzersiz de yapmışsın, süpersin!` : 'Egzersiz yapmamışsın ama olsun, yarın telafi ederiz!'} Kendine iyi bak tatlım! 💕`,
+      `Aşkım bugün nasıl hissediyorsun? 🤗 Verilerine baktım, ${stats.sleep} saat uyku... ${stats.sleep >= 7 ? 'Harika uyumuşsun!' : 'Biraz az ama sorun değil, bu gece erken yat!'} Seninle gurur duyuyorum! ✨`,
     ],
     brutal: [
-      habitPercent < 50
-        ? `${stats.completedHabits}/${stats.totalHabits} alışkanlık mı? Bu rezalet. Bahane üretmeyi bırak ve işine bak.`
-        : `${habitPercent}% fena değil ama daha iyisini yapabilirsin. Kendinle barışık olmayı bırak, zorla kendini.`,
-      stats.exercise === 0
-        ? `Bugün 0 dakika egzersiz. SIFIR. O koltuktan kalk ve bir şeyler yap. Yarın da aynı bahaneyi görmek istemiyorum.`
-        : `${stats.exercise} dakika egzersiz? ${
-            stats.exercise < 30
-              ? "Bu yeterli değil. Minimum 30 dakika olmalı."
-              : "İşte bu! Ama bir gün yapmak yetmez, her gün tekrarla."
-          }`,
-      stats.sleep < 7
-        ? `${stats.sleep} saat uyku? Vücut dinlenmiyor, beyin çalışmıyor. Sonra neden verimli değilim diye ağlama.`
-        : `Uyku düzeni iyi gidiyor. Bunu bozma sakın.`,
+      `${stats.exercise === 0 ? 'Egzersiz 0 dakika. SIFIR. Koltuk seninle evlenme teklifi mi etti? 🛋️💍' : ''} ${stats.sleep < 6 ? `Uyku ${stats.sleep} saat - zombi gibi dolaşıyorsun muhtemelen.` : ''} ${stats.water < 1.5 ? `Su ${stats.water}L - çöl faresi senden daha hidrate.` : ''} Yarın aynı bahaneyi duymak istemiyorum. KALK VE YAP.`,
+      `Alışkanlık skoru %${stats.habitScore}... 📉 Bu notla diplomayı çöpe atarlardı. "${stats.completedHabits}/${stats.totalHabits} fena değil" mi diyorsun? Fena. Çok fena. Mükemmellik %100'dür, gerisi bahane. Şimdi telefonu bırak ve bir alışkanlık tamamla.`,
     ],
     predict: [
-      `🔮 **6 AY SONRASI TAHMİNİ**
+      `🔮 *Kristal küre parlamaya başlıyor...*
 
-📊 Mevcut skorun: ${overallScore}%
+Görüyorum... ${stats.overallScore < 50 ? 'Karanlık bulutlar...' : 'Umut ışıkları...'}
 
-🚀 **İyimser Senaryo** (${Math.min(95, overallScore + 25)}%):
-Tüm alışkanlıklarını tutarsan, 6 ay sonra genel skorun ${Math.min(95, overallScore + 25)}%'e çıkabilir.
+🚀 **Parlak Gelecek**: Her gün %100 tutarsan → 6 ayda bambaşka biri
+⚖️ **Mevcut Gidişat**: %${stats.habitScore} ile devam → 6 ay sonra aynı yer
+💀 **Karanlık Yol**: Bırakırsan → Pişmanlık ve "keşke" dolu günler
 
-⚖️ **Gerçekçi Senaryo** (${Math.min(85, overallScore + 10)}%):
-Bu tempoyla devam edersen, muhtemelen ${Math.min(85, overallScore + 10)}% civarında olacaksın.
-
-⚠️ **Kötümser Senaryo** (${Math.max(20, overallScore - 15)}%):
-Motivasyonunu kaybedersen, ${Math.max(20, overallScore - 15)}%'e düşme riski var.
-
-💡 **Öneri**: ${
-        stats.exercise < 30
-          ? "Egzersiz süresini artır - en büyük etkiyi bu yapacak."
-          : stats.sleep < 7
-          ? "Uyku düzenini iyileştir - tüm diğer metrikleri etkiliyor."
-          : "Tutarlılık! Her gün küçük adımlar, 6 ayda büyük fark yaratır."
-      }`,
+Seçim senin... Ama kristal kürem ${stats.overallScore > 60 ? 'parlak yolu işaret ediyor ✨' : 'uyarı veriyor ⚠️'}`,
     ],
   }
 

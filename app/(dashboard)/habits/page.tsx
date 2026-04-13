@@ -267,7 +267,7 @@ function AddHabitModal({
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
-        className="fixed left-4 right-4 top-20 bottom-20 md:top-1/2 md:bottom-auto md:-translate-y-1/2 md:left-1/2 md:right-auto md:-translate-x-1/2 md:w-full md:max-w-md md:max-h-[85vh] bg-card rounded-2xl shadow-xl z-50 flex flex-col overflow-hidden"
+        className="fixed left-4 right-4 top-20 bottom-20 md:inset-x-auto md:left-1/2 md:top-[10%] md:bottom-auto md:-translate-x-1/2 md:w-full md:max-w-md md:max-h-[80vh] bg-card rounded-2xl shadow-xl z-50 flex flex-col overflow-hidden"
       >
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b shrink-0">

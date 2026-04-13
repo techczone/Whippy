@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react'
 import { motion } from 'framer-motion'
-import { Settings, User, Bell, Moon, Sun, Globe, Shield, Trash2, Download, CreditCard, Check, Monitor, LogOut } from 'lucide-react'
+import { Settings, User, Bell, Moon, Sun, Globe, Shield, Trash2, Download, CreditCard, Check, Monitor, LogOut, Clock, TestTube } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { useAppStore, Theme, Language } from '@/lib/store'
 import { useTranslation } from '@/hooks/use-translation'
 import { useAuth } from '@/hooks/use-auth'
+import { useNotifications } from '@/hooks/use-notifications'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
@@ -18,6 +19,16 @@ export default function SettingsPage() {
   const { t, language } = useTranslation()
   const { user } = useAuth()
   const router = useRouter()
+  const {
+    permission,
+    isSupported,
+    isEnabled,
+    requestPermission,
+    sendTestNotification,
+    scheduleDailyReminder,
+    cancelDailyReminder,
+    getReminderTime,
+  } = useNotifications()
   
   const settings = useAppStore((state) => state.settings)
   const setTheme = useAppStore((state) => state.setTheme)
@@ -26,6 +37,8 @@ export default function SettingsPage() {
   
   const [mounted, setMounted] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [reminderHour, setReminderHour] = useState(9)
+  const [reminderMinute, setReminderMinute] = useState(0)
   const [stats, setStats] = useState({
     habitCount: 0,
     aiUsage: 0,
@@ -35,7 +48,14 @@ export default function SettingsPage() {
   
   useEffect(() => {
     setMounted(true)
-  }, [])
+    
+    // Load saved reminder time
+    const savedTime = getReminderTime()
+    if (savedTime) {
+      setReminderHour(savedTime.hour)
+      setReminderMinute(savedTime.minute)
+    }
+  }, [getReminderTime])
 
   // Fetch user stats
   useEffect(() => {
@@ -46,14 +66,12 @@ export default function SettingsPage() {
 
     const fetchStats = async () => {
       try {
-        // Habit count
         const { data: habits } = await supabase
           .from('habits')
           .select('id')
           .eq('user_id', user.id)
           .eq('archived', false)
 
-        // AI usage (coach messages this month)
         const startOfMonth = new Date()
         startOfMonth.setDate(1)
         startOfMonth.setHours(0, 0, 0, 0)
@@ -88,9 +106,52 @@ export default function SettingsPage() {
     toast.success(newLang === 'tr' ? 'Dil Türkçe olarak değiştirildi' : 'Language changed to English')
   }
   
-  const handleNotificationChange = (key: keyof typeof settings.notifications, value: boolean) => {
+  const handleNotificationChange = async (key: keyof typeof settings.notifications, value: boolean) => {
+    if (key === 'push' && value && permission !== 'granted') {
+      const granted = await requestPermission()
+      if (!granted) {
+        toast.error(language === 'tr' ? 'Bildirim izni reddedildi' : 'Notification permission denied')
+        return
+      }
+    }
+    
     updateNotification(key, value)
     toast.success(language === 'tr' ? 'Bildirim ayarı güncellendi' : 'Notification setting updated')
+  }
+
+  const handleEnableNotifications = async () => {
+    const granted = await requestPermission()
+    if (granted) {
+      toast.success(language === 'tr' ? 'Bildirimler etkinleştirildi! 🎉' : 'Notifications enabled! 🎉')
+    } else {
+      toast.error(language === 'tr' ? 'Bildirim izni reddedildi' : 'Notification permission denied')
+    }
+  }
+
+  const handleTestNotification = async () => {
+    const sent = await sendTestNotification()
+    if (!sent) {
+      toast.error(language === 'tr' ? 'Bildirim gönderilemedi' : 'Failed to send notification')
+    }
+  }
+
+  const handleSetReminder = () => {
+    if (!isEnabled) {
+      toast.error(language === 'tr' ? 'Önce bildirimleri etkinleştirin' : 'Enable notifications first')
+      return
+    }
+    
+    scheduleDailyReminder(reminderHour, reminderMinute)
+    toast.success(
+      language === 'tr' 
+        ? `Hatırlatıcı ${reminderHour.toString().padStart(2, '0')}:${reminderMinute.toString().padStart(2, '0')} için ayarlandı` 
+        : `Reminder set for ${reminderHour.toString().padStart(2, '0')}:${reminderMinute.toString().padStart(2, '0')}`
+    )
+  }
+
+  const handleCancelReminder = () => {
+    cancelDailyReminder()
+    toast.success(language === 'tr' ? 'Hatırlatıcı iptal edildi' : 'Reminder cancelled')
   }
 
   const handleSignOut = async () => {
@@ -109,7 +170,6 @@ export default function SettingsPage() {
     toast.loading(language === 'tr' ? 'Veriler hazırlanıyor...' : 'Preparing data...')
     
     try {
-      // Fetch all user data
       const [habits, habitLogs, goals, healthEntries, moodEntries, projects] = await Promise.all([
         supabase.from('habits').select('*').eq('user_id', user.id),
         supabase.from('habit_logs').select('*').eq('user_id', user.id),
@@ -130,7 +190,6 @@ export default function SettingsPage() {
         projects: projects.data || [],
       }
 
-      // Download as JSON
       const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -170,7 +229,6 @@ export default function SettingsPage() {
     toast.error(language === 'tr' ? 'Hesap silme özelliği yakında!' : 'Account deletion coming soon!')
   }
 
-  // Prevent hydration mismatch
   if (!mounted) {
     return (
       <div className="space-y-6 max-w-4xl mx-auto animate-pulse">
@@ -210,7 +268,6 @@ export default function SettingsPage() {
             <CardDescription>{t.settings.appearance_desc}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Theme Selection */}
             <div>
               <label className="text-sm font-medium mb-3 block">{t.settings.theme}</label>
               <div className="grid grid-cols-3 gap-2">
@@ -235,7 +292,6 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            {/* Language Selection */}
             <div>
               <label className="text-sm font-medium mb-3 block">{t.settings.language}</label>
               <div className="grid grid-cols-2 gap-2">
@@ -271,31 +327,141 @@ export default function SettingsPage() {
             </CardTitle>
             <CardDescription>{t.settings.notifications_desc}</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-1">
-            <ToggleRow
-              label={t.settings.email_notifications}
-              description={t.settings.email_notifications_desc}
-              checked={settings.notifications.email}
-              onChange={(checked) => handleNotificationChange('email', checked)}
-            />
-            <ToggleRow
-              label={t.settings.push_notifications}
-              description={t.settings.push_notifications_desc}
-              checked={settings.notifications.push}
-              onChange={(checked) => handleNotificationChange('push', checked)}
-            />
-            <ToggleRow
-              label={t.settings.habit_reminders}
-              description={t.settings.habit_reminders_desc}
-              checked={settings.notifications.reminders}
-              onChange={(checked) => handleNotificationChange('reminders', checked)}
-            />
-            <ToggleRow
-              label={t.settings.weekly_report}
-              description={t.settings.weekly_report_desc}
-              checked={settings.notifications.weekly}
-              onChange={(checked) => handleNotificationChange('weekly', checked)}
-            />
+          <CardContent className="space-y-4">
+            {/* Push Notification Permission */}
+            {isSupported && (
+              <div className="p-4 rounded-xl bg-gradient-to-r from-orange-500/10 to-red-500/10 border border-orange-500/30">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <p className="font-medium flex items-center gap-2">
+                      <Bell className="w-4 h-4" />
+                      {language === 'tr' ? 'Tarayıcı Bildirimleri' : 'Browser Notifications'}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {permission === 'granted' 
+                        ? (language === 'tr' ? '✅ Bildirimler etkin' : '✅ Notifications enabled')
+                        : permission === 'denied'
+                        ? (language === 'tr' ? '❌ Bildirimler engellendi' : '❌ Notifications blocked')
+                        : (language === 'tr' ? 'Bildirimleri etkinleştir' : 'Enable notifications')
+                      }
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    {permission !== 'granted' ? (
+                      <Button 
+                        size="sm" 
+                        onClick={handleEnableNotifications}
+                        disabled={permission === 'denied'}
+                        className="bg-gradient-to-r from-orange-500 to-red-500"
+                      >
+                        {language === 'tr' ? 'Etkinleştir' : 'Enable'}
+                      </Button>
+                    ) : (
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={handleTestNotification}
+                      >
+                        <TestTube className="w-4 h-4 mr-1" />
+                        {language === 'tr' ? 'Test Et' : 'Test'}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {permission === 'denied' && (
+                  <p className="text-xs text-destructive">
+                    {language === 'tr' 
+                      ? 'Tarayıcı ayarlarından bildirimleri etkinleştirin.' 
+                      : 'Enable notifications from browser settings.'}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Daily Reminder */}
+            {isEnabled && (
+              <div className="p-4 rounded-xl bg-muted/50 border">
+                <div className="flex items-center gap-2 mb-3">
+                  <Clock className="w-4 h-4" />
+                  <p className="font-medium">
+                    {language === 'tr' ? 'Günlük Hatırlatıcı' : 'Daily Reminder'}
+                  </p>
+                </div>
+                <p className="text-sm text-muted-foreground mb-3">
+                  {language === 'tr' 
+                    ? 'Her gün belirlediğin saatte alışkanlıklarını hatırlat' 
+                    : 'Remind you about habits at the set time every day'}
+                </p>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <select 
+                      value={reminderHour}
+                      onChange={(e) => setReminderHour(parseInt(e.target.value))}
+                      className="bg-background border rounded-lg px-3 py-2 text-sm"
+                    >
+                      {Array.from({ length: 24 }, (_, i) => (
+                        <option key={i} value={i}>
+                          {i.toString().padStart(2, '0')}
+                        </option>
+                      ))}
+                    </select>
+                    <span>:</span>
+                    <select 
+                      value={reminderMinute}
+                      onChange={(e) => setReminderMinute(parseInt(e.target.value))}
+                      className="bg-background border rounded-lg px-3 py-2 text-sm"
+                    >
+                      {[0, 15, 30, 45].map((m) => (
+                        <option key={m} value={m}>
+                          {m.toString().padStart(2, '0')}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <Button size="sm" onClick={handleSetReminder}>
+                    {language === 'tr' ? 'Kaydet' : 'Save'}
+                  </Button>
+                  {getReminderTime() && (
+                    <Button size="sm" variant="ghost" onClick={handleCancelReminder}>
+                      {language === 'tr' ? 'İptal' : 'Cancel'}
+                    </Button>
+                  )}
+                </div>
+                {getReminderTime() && (
+                  <p className="text-xs text-green-500 mt-2">
+                    ✅ {language === 'tr' ? 'Hatırlatıcı aktif' : 'Reminder active'}: {getReminderTime()?.hour.toString().padStart(2, '0')}:{getReminderTime()?.minute.toString().padStart(2, '0')}
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div className="space-y-1 pt-2">
+              <ToggleRow
+                label={t.settings.email_notifications}
+                description={t.settings.email_notifications_desc}
+                checked={settings.notifications.email}
+                onChange={(checked) => handleNotificationChange('email', checked)}
+              />
+              <ToggleRow
+                label={t.settings.push_notifications}
+                description={t.settings.push_notifications_desc}
+                checked={settings.notifications.push}
+                onChange={(checked) => handleNotificationChange('push', checked)}
+              />
+              <ToggleRow
+                label={t.settings.habit_reminders}
+                description={t.settings.habit_reminders_desc}
+                checked={settings.notifications.reminders}
+                onChange={(checked) => handleNotificationChange('reminders', checked)}
+              />
+              <ToggleRow
+                label={t.settings.weekly_report}
+                description={t.settings.weekly_report_desc}
+                checked={settings.notifications.weekly}
+                onChange={(checked) => handleNotificationChange('weekly', checked)}
+              />
+            </div>
           </CardContent>
         </Card>
       </motion.div>
@@ -354,11 +520,11 @@ export default function SettingsPage() {
               <div>
                 <p className="font-semibold">🆓 {language === 'tr' ? 'Ücretsiz Plan' : 'Free Plan'}</p>
                 <p className="text-sm text-muted-foreground">
-                  {language === 'tr' ? 'Temel özellikler' : 'Basic features'}
+                  {language === 'tr' ? 'Tüm özellikler açık!' : 'All features unlocked!'}
                 </p>
               </div>
-              <Button className="bg-gradient-to-r from-orange-500 to-red-500 hover:opacity-90">
-                {language === 'tr' ? "Pro'ya Yükselt" : 'Upgrade to Pro'}
+              <Button className="bg-gradient-to-r from-orange-500 to-red-500 hover:opacity-90" disabled>
+                {language === 'tr' ? 'Yakında Pro' : 'Pro Coming Soon'}
               </Button>
             </div>
 
@@ -419,7 +585,7 @@ export default function SettingsPage() {
         <Card>
           <CardContent className="pt-6">
             <div className="text-center text-sm text-muted-foreground">
-              <p className="font-medium">Whippy v1.0.0</p>
+              <p className="font-medium">Whippy v1.1.0</p>
               <p className="mt-1">© 2025 Whippy. {language === 'tr' ? 'Tüm hakları saklıdır.' : 'All rights reserved.'}</p>
               <div className="flex justify-center gap-4 mt-3">
                 <a href="/privacy" className="hover:text-foreground transition-colors">{t.settings.privacy_policy}</a>
@@ -436,26 +602,13 @@ export default function SettingsPage() {
   )
 }
 
-// Theme Button Component
-function ThemeButton({
-  active,
-  onClick,
-  icon,
-  label,
-}: {
-  active: boolean
-  onClick: () => void
-  icon: React.ReactNode
-  label: string
-}) {
+function ThemeButton({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string }) {
   return (
     <button
       onClick={onClick}
       className={cn(
         'flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all duration-200',
-        active
-          ? 'border-orange-500 bg-orange-500/10 text-orange-500'
-          : 'border-border hover:border-muted-foreground/50 hover:bg-muted/50'
+        active ? 'border-orange-500 bg-orange-500/10 text-orange-500' : 'border-border hover:border-muted-foreground/50 hover:bg-muted/50'
       )}
     >
       {icon}
@@ -465,26 +618,13 @@ function ThemeButton({
   )
 }
 
-// Language Button Component
-function LanguageButton({
-  active,
-  onClick,
-  flag,
-  label,
-}: {
-  active: boolean
-  onClick: () => void
-  flag: string
-  label: string
-}) {
+function LanguageButton({ active, onClick, flag, label }: { active: boolean; onClick: () => void; flag: string; label: string }) {
   return (
     <button
       onClick={onClick}
       className={cn(
         'flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all duration-200',
-        active
-          ? 'border-orange-500 bg-orange-500/10 text-orange-500'
-          : 'border-border hover:border-muted-foreground/50 hover:bg-muted/50'
+        active ? 'border-orange-500 bg-orange-500/10 text-orange-500' : 'border-border hover:border-muted-foreground/50 hover:bg-muted/50'
       )}
     >
       <span className="text-lg">{flag}</span>
@@ -494,18 +634,7 @@ function LanguageButton({
   )
 }
 
-// Toggle Row Component
-function ToggleRow({
-  label,
-  description,
-  checked,
-  onChange,
-}: {
-  label: string
-  description: string
-  checked: boolean
-  onChange: (checked: boolean) => void
-}) {
+function ToggleRow({ label, description, checked, onChange }: { label: string; description: string; checked: boolean; onChange: (checked: boolean) => void }) {
   return (
     <div className="flex items-center justify-between py-3 border-b border-border/50 last:border-0">
       <div>
@@ -514,10 +643,7 @@ function ToggleRow({
       </div>
       <button
         onClick={() => onChange(!checked)}
-        className={cn(
-          'w-12 h-6 rounded-full transition-colors relative shrink-0',
-          checked ? 'bg-orange-500' : 'bg-muted'
-        )}
+        className={cn('w-12 h-6 rounded-full transition-colors relative shrink-0', checked ? 'bg-orange-500' : 'bg-muted')}
       >
         <motion.div
           className="w-5 h-5 rounded-full bg-white absolute top-0.5 shadow-sm"

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'whippy-v1';
+const CACHE_NAME = 'whippy-v2';
 
 // Assets to cache on install
 const STATIC_ASSETS = [
@@ -9,6 +9,8 @@ const STATIC_ASSETS = [
   '/health',
   '/coach',
   '/offline',
+  '/logo.png',
+  '/favicon.ico',
 ];
 
 // Install event - cache static assets
@@ -48,20 +50,18 @@ self.addEventListener('fetch', (event) => {
       .then((response) => {
         // Clone the response before caching
         const responseClone = response.clone();
-        
         caches.open(CACHE_NAME).then((cache) => {
           cache.put(event.request, responseClone);
         });
-
         return response;
       })
       .catch(() => {
-        // Fallback to cache
+        // If network fails, try cache
         return caches.match(event.request).then((response) => {
           if (response) {
             return response;
           }
-          // If no cache, return offline page for navigation requests
+          // If not in cache either, return offline page for navigation
           if (event.request.mode === 'navigate') {
             return caches.match('/offline');
           }
@@ -73,26 +73,48 @@ self.addEventListener('fetch', (event) => {
 
 // Push notification event
 self.addEventListener('push', (event) => {
-  if (!event.data) return;
+  let data = {
+    title: 'Whippy 🔥',
+    body: 'Yeni bir bildirim var!',
+    icon: '/logo.png',
+    badge: '/favicon-48.png',
+    url: '/dashboard',
+  };
 
-  const data = event.data.json();
-  
+  if (event.data) {
+    try {
+      data = { ...data, ...event.data.json() };
+    } catch (e) {
+      data.body = event.data.text();
+    }
+  }
+
   const options = {
-    body: data.body || 'Yeni bildirim',
-    icon: '/icons/icon-192x192.png',
-    badge: '/icons/icon-72x72.png',
-    vibrate: [100, 50, 100],
+    body: data.body,
+    icon: data.icon || '/logo.png',
+    badge: data.badge || '/favicon-48.png',
+    vibrate: [200, 100, 200],
+    tag: data.tag || 'whippy-push',
+    renotify: true,
+    requireInteraction: false,
     data: {
       url: data.url || '/dashboard',
+      timestamp: Date.now(),
     },
     actions: [
-      { action: 'open', title: 'Aç' },
-      { action: 'close', title: 'Kapat' },
+      {
+        action: 'open',
+        title: 'Aç',
+      },
+      {
+        action: 'dismiss',
+        title: 'Kapat',
+      },
     ],
   };
 
   event.waitUntil(
-    self.registration.showNotification(data.title || 'Whippy', options)
+    self.registration.showNotification(data.title, options)
   );
 });
 
@@ -100,23 +122,89 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
-  if (event.action === 'close') return;
+  const urlToOpen = event.notification.data?.url || '/dashboard';
 
-  const url = event.notification.data?.url || '/dashboard';
+  if (event.action === 'dismiss') {
+    return;
+  }
 
   event.waitUntil(
-    clients.matchAll({ type: 'window' }).then((clientList) => {
-      // Focus existing window if open
-      for (const client of clientList) {
-        if (client.url.includes(self.location.origin) && 'focus' in client) {
-          client.navigate(url);
-          return client.focus();
+    clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then((clientList) => {
+        // If there's already a window open, focus it
+        for (const client of clientList) {
+          if (client.url.includes(self.location.origin) && 'focus' in client) {
+            client.navigate(urlToOpen);
+            return client.focus();
+          }
         }
-      }
-      // Open new window
-      if (clients.openWindow) {
-        return clients.openWindow(url);
-      }
-    })
+        // Otherwise, open a new window
+        if (clients.openWindow) {
+          return clients.openWindow(urlToOpen);
+        }
+      })
   );
+});
+
+// Background sync for offline actions
+self.addEventListener('sync', (event) => {
+  if (event.tag === 'sync-habits') {
+    event.waitUntil(syncHabits());
+  }
+});
+
+async function syncHabits() {
+  // Get queued habit completions from IndexedDB
+  // This would sync any offline habit completions when back online
+  console.log('Syncing habits...');
+}
+
+// Periodic background sync for reminders (if supported)
+self.addEventListener('periodicsync', (event) => {
+  if (event.tag === 'daily-reminder') {
+    event.waitUntil(checkAndSendReminder());
+  }
+});
+
+async function checkAndSendReminder() {
+  // Check localStorage for reminder time
+  // Note: This won't work directly in SW, would need IndexedDB
+  const now = new Date();
+  const hour = now.getHours();
+  
+  // Default reminder at 9 AM if not set
+  if (hour === 9) {
+    await self.registration.showNotification('Günaydın! ☀️', {
+      body: 'Bugünkü alışkanlıklarını tamamlamayı unutma!',
+      icon: '/logo.png',
+      badge: '/favicon-48.png',
+      tag: 'daily-reminder',
+      data: { url: '/habits' },
+    });
+  }
+}
+
+// Message handler for communication with main app
+self.addEventListener('message', (event) => {
+  if (event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+  
+  if (event.data.type === 'SEND_NOTIFICATION') {
+    const { title, body, url, tag } = event.data.payload;
+    self.registration.showNotification(title, {
+      body,
+      icon: '/logo.png',
+      badge: '/favicon-48.png',
+      tag: tag || 'app-notification',
+      data: { url: url || '/dashboard' },
+    });
+  }
+
+  if (event.data.type === 'SCHEDULE_REMINDER') {
+    // Store reminder time in IndexedDB for persistence
+    const { hour, minute } = event.data.payload;
+    // This would need IndexedDB implementation for true persistence
+    console.log(`Reminder scheduled for ${hour}:${minute}`);
+  }
 });

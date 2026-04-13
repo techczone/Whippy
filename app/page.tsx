@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Brain, 
@@ -172,9 +173,7 @@ export default function LandingPage() {
       }`}>
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
-            <Image src="/logo.png" alt="Whippy" width={36} height={36} className="rounded-xl" />ow-orange-500/30">
-              <span className="text-lg">🔥</span>
-            </div>
+            <Image src="/logo.png" alt="Whippy" width={36} height={36} className="rounded-xl" />
             <span className="font-bold text-xl bg-gradient-to-r from-orange-400 to-red-500 bg-clip-text text-transparent">Whippy</span>
           </Link>
 
@@ -242,7 +241,7 @@ export default function LandingPage() {
       </header>
 
       {/* Hero */}
-      <section className="pt-28 md:pt-32 pb-16 md:pb-20 px-4">
+      <section className="pt-32 pb-20 px-4">
         <div className="max-w-4xl mx-auto text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -259,7 +258,7 @@ export default function LandingPage() {
               <span className="bg-gradient-to-r from-orange-400 via-red-500 to-pink-500 bg-clip-text text-transparent">Yaşam Koçun</span>
             </h1>
             
-            <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
+            <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
               Alışkanlıklarını takip et, hedeflerine ulaş ve AI koçunla her gün daha iyi bir versiyon ol.
               <strong className="text-orange-400"> Bahanelere yer yok.</strong> 🔥
             </p>
@@ -279,30 +278,20 @@ export default function LandingPage() {
               </Link>
             </div>
 
-            <p className="text-sm text-muted-foreground mt-4">
-              ✓ Kredi kartı gerekmez &nbsp; ✓ 30 saniyede kayıt &nbsp; ✓ Tamamen ücretsiz
-            </p>
-          </motion.div>
-
-          {/* Stats */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-12 max-w-3xl mx-auto"
-          >
-            {STATS.map((stat, i) => (
-              <div key={i} className="p-4 rounded-xl bg-secondary/50 border border-border">
-                <p className="text-2xl md:text-3xl font-bold text-orange-500">{stat.value}</p>
-                <p className="text-sm text-muted-foreground">{stat.label}</p>
-              </div>
-            ))}
+            <div className="mt-12 grid grid-cols-2 md:grid-cols-4 gap-8">
+              {STATS.map((stat) => (
+                <div key={stat.label}>
+                  <div className="text-2xl md:text-3xl font-bold text-orange-500">{stat.value}</div>
+                  <div className="text-sm text-muted-foreground">{stat.label}</div>
+                </div>
+              ))}
+            </div>
           </motion.div>
         </div>
       </section>
 
       {/* Features */}
-      <section id="features" className="py-20 px-4 bg-gradient-to-b from-transparent to-secondary/30">
+      <section id="features" className="py-20 px-4 bg-gradient-to-b from-transparent to-orange-500/5">
         <div className="max-w-6xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -310,9 +299,9 @@ export default function LandingPage() {
             viewport={{ once: true }}
             className="text-center mb-12"
           >
-            <h2 className="text-3xl font-bold mb-4">Neden Whippy? 🚀</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              Hedeflerine ulaşmak için ihtiyacın olan tüm araçlar tek bir uygulamada
+            <h2 className="text-3xl font-bold mb-4">Tüm İhtiyacın Tek Yerde 🚀</h2>
+            <p className="text-muted-foreground">
+              Hedeflerine ulaşmak için gereken her şey
             </p>
           </motion.div>
 
@@ -340,18 +329,60 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* How It Works - Coach Modes */}
+      {/* How it Works */}
       <section id="how-it-works" className="py-20 px-4">
-        <div className="max-w-5xl mx-auto">
+        <div className="max-w-4xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             className="text-center mb-12"
           >
-            <h2 className="text-3xl font-bold mb-4">3 Farklı Koçluk Modu</h2>
+            <h2 className="text-3xl font-bold mb-4">Nasıl Çalışır? 🎯</h2>
             <p className="text-muted-foreground">
-              İhtiyacına göre koçunu özelleştir - Nazik mi, Acımasız mı?
+              3 basit adımda başla
+            </p>
+          </motion.div>
+
+          <div className="space-y-8">
+            {[
+              { step: '1', title: 'Ücretsiz Kaydol', desc: 'Google ile 10 saniyede giriş yap, hemen kullanmaya başla.' },
+              { step: '2', title: 'Hedeflerini Belirle', desc: 'Alışkanlıklarını, hedeflerini ve sağlık metriklerini ekle.' },
+              { step: '3', title: 'AI Koçunla Büyü', desc: 'Her gün AI koçundan kişiselleştirilmiş geri bildirim al.' },
+            ].map((item, i) => (
+              <motion.div
+                key={item.step}
+                initial={{ opacity: 0, x: -20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.1 }}
+                className="flex gap-4 items-start"
+              >
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center text-white font-bold shrink-0">
+                  {item.step}
+                </div>
+                <div>
+                  <h3 className="font-semibold text-lg">{item.title}</h3>
+                  <p className="text-muted-foreground">{item.desc}</p>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Coach Modes */}
+      <section className="py-20 px-4 bg-gradient-to-b from-orange-500/5 to-transparent">
+        <div className="max-w-4xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-center mb-12"
+          >
+            <h2 className="text-3xl font-bold mb-4">3 Farklı Koçluk Modu 🎭</h2>
+            <p className="text-muted-foreground">
+              İhtiyacına göre koçunu özelleştir
             </p>
           </motion.div>
 
@@ -403,7 +434,7 @@ export default function LandingPage() {
                         <Star key={j} className="w-4 h-4 fill-orange-500 text-orange-500" />
                       ))}
                     </div>
-                    <p className="text-sm mb-4 italic">"{t.quote}"</p>
+                    <p className="text-sm mb-4 italic">&quot;{t.quote}&quot;</p>
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center text-xl">
                         {t.avatar}
@@ -492,7 +523,7 @@ export default function LandingPage() {
           className="max-w-3xl mx-auto text-center"
         >
           <div className="p-8 md:p-12 rounded-3xl bg-gradient-to-br from-orange-500/20 to-red-600/20 border border-orange-500/30">
-            <div className="text-5xl mb-4">🔥</div>
+            <Image src="/logo.png" alt="Whippy" width={64} height={64} className="mx-auto mb-4 rounded-xl" />
             <h2 className="text-3xl font-bold mb-4">
               Bahanelere son ver, bugün başla
             </h2>
@@ -518,9 +549,7 @@ export default function LandingPage() {
           <div className="grid md:grid-cols-4 gap-8 mb-8">
             <div>
               <div className="flex items-center gap-2 mb-4">
-                <Image src="/logo.png" alt="Whippy" width={32} height={32} className="rounded-lg" />ow-orange-500/20">
-                  <span className="text-sm">🔥</span>
-                </div>
+                <Image src="/logo.png" alt="Whippy" width={32} height={32} className="rounded-lg" />
                 <span className="font-bold bg-gradient-to-r from-orange-400 to-red-500 bg-clip-text text-transparent">Whippy</span>
               </div>
               <p className="text-sm text-muted-foreground">

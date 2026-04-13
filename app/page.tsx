@@ -172,7 +172,7 @@ export default function LandingPage() {
       }`}>
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center shadow-lg shadow-orange-500/30">
+            <Image src="/logo.png" alt="Whippy" width={36} height={36} className="rounded-xl" />ow-orange-500/30">
               <span className="text-lg">🔥</span>
             </div>
             <span className="font-bold text-xl bg-gradient-to-r from-orange-400 to-red-500 bg-clip-text text-transparent">Whippy</span>
@@ -518,7 +518,7 @@ export default function LandingPage() {
           <div className="grid md:grid-cols-4 gap-8 mb-8">
             <div>
               <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center shadow-lg shadow-orange-500/20">
+                <Image src="/logo.png" alt="Whippy" width={32} height={32} className="rounded-lg" />ow-orange-500/20">
                   <span className="text-sm">🔥</span>
                 </div>
                 <span className="font-bold bg-gradient-to-r from-orange-400 to-red-500 bg-clip-text text-transparent">Whippy</span>

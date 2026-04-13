@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -116,9 +117,13 @@ export function Sidebar() {
         {/* Logo */}
         <div className="p-4 border-b border-border shrink-0">
           <Link href="/dashboard" className="flex items-center" onClick={handleNavClick}>
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center shadow-lg shadow-orange-500/30 shrink-0">
-              <span className="text-lg">🔥</span>
-            </div>
+            <Image 
+              src="/logo.png" 
+              alt="Whippy" 
+              width={36} 
+              height={36}
+              className="rounded-xl shrink-0"
+            />
             <AnimatePresence>
               {(sidebarOpen || mobileOpen) && (
                 <motion.span

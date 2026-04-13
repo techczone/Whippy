@@ -60,9 +60,9 @@ export const metadata: Metadata = {
     locale: 'tr_TR',
     images: [
       {
-        url: '/og-image.png',
-        width: 1200,
-        height: 630,
+        url: '/logo.png',
+        width: 200,
+        height: 200,
         alt: 'Whippy - Acımasız AI Yaşam Koçun',
       },
     ],
@@ -72,7 +72,7 @@ export const metadata: Metadata = {
     title: 'Whippy - Acımasız AI Yaşam Koçun',
     description: 'Bahane yok, sadece sonuç. 🔥',
     creator: '@whippylife',
-    images: ['/og-image.png'],
+    images: ['/logo.png'],
   },
   robots: {
     index: true,
@@ -88,14 +88,11 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       { url: '/favicon.ico', sizes: 'any' },
-      { url: '/icons/icon-32x32.png', sizes: '32x32', type: 'image/png' },
-      { url: '/icons/icon-16x16.png', sizes: '16x16', type: 'image/png' },
+      { url: '/favicon-32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/favicon-16.png', sizes: '16x16', type: 'image/png' },
     ],
     apple: [
-      { url: '/icons/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
-    ],
-    other: [
-      { rel: 'mask-icon', url: '/icons/safari-pinned-tab.svg', color: '#f97316' },
+      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
     ],
   },
   manifest: '/manifest.json',

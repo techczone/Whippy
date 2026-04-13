@@ -25,6 +25,8 @@ interface AICoachProps {
     projects: string
   }
   className?: string
+  quickPrompt?: string | null
+  onQuickPromptProcessed?: () => void
 }
 
 const COACH_MODES = [
@@ -60,7 +62,7 @@ const COACH_MODES = [
   },
 ]
 
-export function AICoach({ onSendMessage, stats, className }: AICoachProps) {
+export function AICoach({ onSendMessage, stats, className, quickPrompt, onQuickPromptProcessed }: AICoachProps) {
   const { coachMode, setCoachMode, coachMessages, addCoachMessage } = useAppStore()
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -73,13 +75,21 @@ export function AICoach({ onSendMessage, stats, className }: AICoachProps) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [coachMessages])
 
-  const handleSend = async () => {
-    if (!input.trim() || isLoading) return
+  // Handle quick prompt from parent
+  useEffect(() => {
+    if (quickPrompt && !isLoading) {
+      sendMessage(quickPrompt)
+      onQuickPromptProcessed?.()
+    }
+  }, [quickPrompt])
+
+  const sendMessage = async (messageText: string) => {
+    if (!messageText.trim() || isLoading) return
 
     const userMessage: CoachMessage = {
       id: Date.now().toString(),
       role: 'user',
-      content: input.trim(),
+      content: messageText.trim(),
       mode: coachMode,
       timestamp: new Date().toISOString(),
     }
@@ -92,14 +102,13 @@ export function AICoach({ onSendMessage, stats, className }: AICoachProps) {
       let response: string
       
       if (onSendMessage) {
-        response = await onSendMessage(input.trim(), coachMode)
+        response = await onSendMessage(messageText.trim(), coachMode)
       } else if (stats) {
-        // API route kullan
         const apiResponse = await fetch('/api/coach', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            message: input.trim(),
+            message: messageText.trim(),
             mode: coachMode,
             stats,
             history: coachMessages.slice(-10).map(m => ({
@@ -111,7 +120,7 @@ export function AICoach({ onSendMessage, stats, className }: AICoachProps) {
         const data = await apiResponse.json()
         response = data.content
       } else {
-        response = await mockCoachResponse(input.trim(), coachMode)
+        response = await mockCoachResponse(messageText.trim(), coachMode)
       }
 
       const assistantMessage: CoachMessage = {
@@ -129,6 +138,8 @@ export function AICoach({ onSendMessage, stats, className }: AICoachProps) {
       setIsLoading(false)
     }
   }
+
+  const handleSend = () => sendMessage(input)
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {

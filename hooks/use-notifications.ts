@@ -6,14 +6,12 @@ import { useAppStore } from '@/lib/store'
 export interface NotificationState {
   permission: NotificationPermission | 'unsupported'
   isSupported: boolean
-  isEnabled: boolean
 }
 
 export function useNotifications() {
   const [state, setState] = useState<NotificationState>({
     permission: 'default',
     isSupported: false,
-    isEnabled: false,
   })
   
   const settings = useAppStore((state) => state.settings)
@@ -29,7 +27,6 @@ export function useNotifications() {
       setState({
         permission: 'unsupported',
         isSupported: false,
-        isEnabled: false,
       })
       return
     }
@@ -37,39 +34,16 @@ export function useNotifications() {
     setState({
       permission: Notification.permission,
       isSupported: true,
-      isEnabled: Notification.permission === 'granted' && settings.notifications.push,
     })
-  }, [settings.notifications.push])
 
-  // Request permission
-  const requestPermission = useCallback(async (): Promise<boolean> => {
-    if (!state.isSupported) {
-      console.warn('Notifications not supported')
-      return false
+    // Register service worker on load
+    if (Notification.permission === 'granted') {
+      registerServiceWorker()
     }
+  }, [])
 
-    try {
-      const permission = await Notification.requestPermission()
-      
-      setState(prev => ({
-        ...prev,
-        permission,
-        isEnabled: permission === 'granted',
-      }))
-
-      if (permission === 'granted') {
-        updateNotification('push', true)
-        // Register service worker for push
-        await registerServiceWorker()
-        return true
-      }
-      
-      return false
-    } catch (error) {
-      console.error('Error requesting notification permission:', error)
-      return false
-    }
-  }, [state.isSupported, updateNotification])
+  // Derived state
+  const isEnabled = state.permission === 'granted'
 
   // Register service worker
   const registerServiceWorker = async () => {
@@ -84,49 +58,96 @@ export function useNotifications() {
     }
   }
 
-  // Send local notification
-  const sendNotification = useCallback(async (
-    title: string,
-    options?: NotificationOptions
-  ): Promise<boolean> => {
-    if (!state.isEnabled) {
-      console.warn('Notifications not enabled')
+  // Request permission
+  const requestPermission = useCallback(async (): Promise<boolean> => {
+    if (!state.isSupported) {
+      console.warn('Notifications not supported')
       return false
     }
 
     try {
-      // Try to use service worker notification (works when app is in background)
-      const registration = await navigator.serviceWorker.ready
-      await registration.showNotification(title, {
-        icon: '/logo.png',
-        badge: '/favicon-48.png',
-        vibrate: [200, 100, 200],
-        tag: 'whippy-notification',
-        renotify: true,
-        ...options,
-      })
-      return true
+      const permission = await Notification.requestPermission()
+      
+      setState(prev => ({
+        ...prev,
+        permission,
+      }))
+
+      if (permission === 'granted') {
+        updateNotification('push', true)
+        await registerServiceWorker()
+        return true
+      }
+      
+      return false
     } catch (error) {
-      // Fallback to regular notification
-      try {
-        new Notification(title, {
+      console.error('Error requesting notification permission:', error)
+      return false
+    }
+  }, [state.isSupported, updateNotification])
+
+  // Send notification - direct approach
+  const sendNotification = useCallback(async (
+    title: string,
+    options?: NotificationOptions
+  ): Promise<boolean> => {
+    // Check permission directly
+    if (Notification.permission !== 'granted') {
+      console.warn('Notification permission not granted')
+      return false
+    }
+
+    try {
+      // First try service worker notification
+      if ('serviceWorker' in navigator) {
+        const registration = await navigator.serviceWorker.ready
+        await registration.showNotification(title, {
           icon: '/logo.png',
           badge: '/favicon-48.png',
+          vibrate: [200, 100, 200],
+          tag: 'whippy-notification',
+          renotify: true,
           ...options,
         })
+        console.log('Notification sent via SW')
         return true
-      } catch (e) {
-        console.error('Error sending notification:', e)
-        return false
       }
+    } catch (swError) {
+      console.log('SW notification failed, trying direct:', swError)
     }
-  }, [state.isEnabled])
+
+    // Fallback to direct notification
+    try {
+      const notification = new Notification(title, {
+        icon: '/logo.png',
+        badge: '/favicon-48.png',
+        ...options,
+      })
+      
+      notification.onclick = () => {
+        window.focus()
+        notification.close()
+      }
+      
+      console.log('Direct notification sent')
+      return true
+    } catch (error) {
+      console.error('Error sending notification:', error)
+      return false
+    }
+  }, [])
 
   // Schedule daily reminder
   const scheduleDailyReminder = useCallback((hour: number, minute: number = 0) => {
-    // Store in localStorage for service worker to pick up
+    // Store in localStorage
     const reminderTime = { hour, minute }
     localStorage.setItem('whippy-reminder-time', JSON.stringify(reminderTime))
+    
+    // Clear existing timeout
+    const existingTimeout = localStorage.getItem('whippy-reminder-timeout')
+    if (existingTimeout) {
+      clearTimeout(parseInt(existingTimeout))
+    }
     
     // Calculate next reminder time
     const now = new Date()
@@ -140,20 +161,19 @@ export function useNotifications() {
     
     const msUntilReminder = reminderDate.getTime() - now.getTime()
     
-    // Set timeout for next reminder (will be reset on page reload)
-    // For persistent reminders, we'll use the service worker
-    const timeoutId = setTimeout(() => {
+    console.log(`Reminder scheduled in ${Math.round(msUntilReminder / 1000 / 60)} minutes`)
+    
+    // Set timeout
+    const timeoutId = window.setTimeout(() => {
       sendNotification('Whippy Hatırlatıcı 🔥', {
         body: 'Bugünkü alışkanlıklarını tamamlamayı unutma!',
         tag: 'daily-reminder',
-        data: { url: '/habits' },
       })
       
       // Schedule next day
       scheduleDailyReminder(hour, minute)
     }, msUntilReminder)
     
-    // Store timeout ID for cleanup
     localStorage.setItem('whippy-reminder-timeout', timeoutId.toString())
     
     return reminderDate
@@ -171,6 +191,7 @@ export function useNotifications() {
 
   // Get stored reminder time
   const getReminderTime = useCallback((): { hour: number; minute: number } | null => {
+    if (typeof window === 'undefined') return null
     const stored = localStorage.getItem('whippy-reminder-time')
     if (stored) {
       try {
@@ -195,7 +216,6 @@ export function useNotifications() {
     return sendNotification(`${habitName} zamanı! ⏰`, {
       body: 'Bu alışkanlığı tamamlamayı unutma.',
       tag: `habit-${habitName}`,
-      data: { url: '/habits' },
     })
   }, [sendNotification])
 
@@ -210,12 +230,13 @@ export function useNotifications() {
     return sendNotification(`${streak} Günlük Seri! 🏆`, {
       body: `${habitName} için harika gidiyorsun!`,
       tag: 'streak-alert',
-      data: { url: '/habits' },
     })
   }, [sendNotification])
 
   return {
-    ...state,
+    permission: state.permission,
+    isSupported: state.isSupported,
+    isEnabled,
     requestPermission,
     sendNotification,
     sendTestNotification,
